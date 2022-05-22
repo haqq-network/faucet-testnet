@@ -2,8 +2,6 @@ package server
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -15,14 +13,11 @@ import (
 	"github.com/urfave/negroni"
 
 	"github.com/haqq-network/faucet-testnet/internal/chain"
-	"github.com/haqq-network/faucet-testnet/internal/server/authenticator"
 	"github.com/haqq-network/faucet-testnet/web"
-
-	sessions "github.com/goincremental/negroni-sessions"
-	"github.com/goincremental/negroni-sessions/cookiestore"
 )
 
 const AddressKey string = "address"
+const GithubKey string = "github"
 
 type Server struct {
 	chain.TxBuilder
@@ -39,7 +34,7 @@ func NewServer(builder chain.TxBuilder, cfg *Config) *Server {
 	}
 }
 
-func (s *Server) setupRouter(auth *authenticator.Authenticator) *http.ServeMux {
+func (s *Server) setupRouter() *http.ServeMux {
 	router := http.NewServeMux()
 
 	router.Handle("/", http.FileServer(web.Dist()))
@@ -47,9 +42,7 @@ func (s *Server) setupRouter(auth *authenticator.Authenticator) *http.ServeMux {
 	limiter := NewLimiter(s.cfg.proxyCount, time.Duration(s.cfg.interval)*time.Minute)
 	router.Handle("/api/claim", negroni.New(limiter, negroni.Wrap(s.handleClaim())))
 	router.Handle("/api/info", s.handleInfo())
-
-	router.Handle("/callback", s.callback(auth))
-	router.Handle("/login", s.login(auth))
+	router.Handle("/api/requested", s.handleLastRequest())
 
 	return router
 }
@@ -64,15 +57,7 @@ func (s *Server) Run() {
 
 	n := negroni.New(negroni.NewRecovery(), negroni.NewLogger())
 
-	auth, err := authenticator.New()
-	if err != nil {
-		log.Fatalf("Failed to initialize the authenticator: %v", err)
-	}
-
-	store := cookiestore.New([]byte("secret"))
-	n.Use(sessions.Sessions("auth-session", store))
-
-	n.UseHandler(s.setupRouter(auth))
+	n.UseHandler(s.setupRouter())
 
 	log.Infof("Starting http server %d", s.cfg.httpPort)
 	log.Fatal(http.ListenAndServe(":"+strconv.Itoa(s.cfg.httpPort), n))
@@ -162,74 +147,29 @@ func (s *Server) handleInfo() http.HandlerFunc {
 	}
 }
 
-func (s *Server) login(auth *authenticator.Authenticator) http.HandlerFunc {
+func (s *Server) handleLastRequest() http.HandlerFunc {
+	type info struct {
+		Github            string `json:"github"`
+		LastRequestedTime int64  `json:"last_requested_time"`
+	}
 	return func(w http.ResponseWriter, r *http.Request) {
-		state, err := generateRandomState()
-		if err != nil {
-			log.WithError(err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+		if r.Method != "GET" {
+			http.NotFound(w, r)
 			return
 		}
 
-		// Save the state inside the session.
-		session := sessions.GetSession(r)
-		session.Set("state", state)
+		github := r.FormValue(GithubKey)
+		if len(github) == 0 {
+			http.Error(w, "Empty github name", http.StatusInternalServerError)
+			return
+		}
+		// TODO: go to db and get row if no row return 0 if exists return requested time
+		lastRequestedTime := time.Now().Unix()
 
-		http.Redirect(w, r, auth.AuthCodeURL(state), http.StatusTemporaryRedirect)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(info{
+			Github:            github,
+			LastRequestedTime: lastRequestedTime,
+		})
 	}
-}
-
-func (s *Server) callback(auth *authenticator.Authenticator) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		session := sessions.GetSession(r)
-
-		fmt.Println(session.Get("state"))
-		fmt.Println(r.URL.Query().Get("state"))
-
-		//if session.Get("state") != r.URL.Query().Get("state") {
-		//	log.Error("Invalid state parameter.")
-		//	http.Error(w, "Invalid state parameter.", http.StatusBadRequest)
-		//	return
-		//}
-
-		// Exchange an authorization code for a token.
-		fmt.Println(r.URL.Query().Get("code"))
-		token, err := auth.Exchange(context.Background(), r.URL.Query().Get("code"))
-		if err != nil {
-			log.WithError(err)
-			http.Error(w, "Failed to exchange an authorization code for a token.", http.StatusUnauthorized)
-			return
-		}
-
-		idToken, err := auth.VerifyIDToken(context.Background(), token)
-		if err != nil {
-			log.WithError(err)
-			http.Error(w, "Failed to verify ID Token.", http.StatusInternalServerError)
-			return
-		}
-
-		var profile map[string]interface{}
-		if err := idToken.Claims(&profile); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		session.Set("access_token", token.AccessToken)
-		session.Set("profile", profile)
-
-		// Redirect to logged in page.
-		http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
-	}
-}
-
-func generateRandomState() (string, error) {
-	b := make([]byte, 32)
-	_, err := rand.Read(b)
-	if err != nil {
-		return "", err
-	}
-
-	state := base64.StdEncoding.EncodeToString(b)
-
-	return state, nil
 }
