@@ -4,8 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/go-pg/pg"
-	"github.com/haqq-network/faucet-testnet/database"
 	"net/http"
 	"strconv"
 	"time"
@@ -23,28 +21,16 @@ const GithubKey string = "github"
 
 type Server struct {
 	chain.TxBuilder
-	mutex        trylock.Mutex
-	cfg          *Config
-	queue        chan string
-	requestStore *database.RequestStore
-	db           *pg.DB
+	mutex trylock.Mutex
+	cfg   *Config
+	queue chan string
 }
 
 func NewServer(builder chain.TxBuilder, cfg *Config) *Server {
-
-	db, err := database.DBConn()
-	if err != nil {
-		panic(err.Error())
-		return nil
-	}
-
-	requestStore := database.NewRequestStore(db)
 	return &Server{
-		TxBuilder:    builder,
-		cfg:          cfg,
-		queue:        make(chan string, cfg.queueCap),
-		requestStore: requestStore,
-		db:           db,
+		TxBuilder: builder,
+		cfg:       cfg,
+		queue:     make(chan string, cfg.queueCap),
 	}
 }
 
@@ -70,13 +56,9 @@ func (s *Server) Run() {
 	}()
 
 	n := negroni.New(negroni.NewRecovery(), negroni.NewLogger())
-<<<<<<< HEAD
 
 	n.UseHandler(s.setupRouter())
 
-=======
-	n.UseHandler(s.setupRouter())
->>>>>>> origin/main
 	log.Infof("Starting http server %d", s.cfg.httpPort)
 	log.Fatal(http.ListenAndServe(":"+strconv.Itoa(s.cfg.httpPort), n))
 }
@@ -110,12 +92,6 @@ func (s *Server) handleClaim() http.HandlerFunc {
 		}
 
 		address := r.PostFormValue(AddressKey)
-		github := r.PostFormValue(GithubKey)
-		// TODO: check if user has valid github account
-		if len(github) == 0 {
-			http.Error(w, "github account not valid", http.StatusInternalServerError)
-			return
-		}
 		// Try to lock mutex if the work queue is empty
 		if len(s.queue) != 0 || !s.mutex.TryLock() {
 			select {
@@ -134,12 +110,6 @@ func (s *Server) handleClaim() http.HandlerFunc {
 
 		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 		defer cancel()
-		_, err := s.requestStore.Insert(github)
-		if err != nil {
-			log.WithError(err).Error("Failed to save request")
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
 		txHash, err := s.Transfer(ctx, address, chain.EtherToWei(int64(s.cfg.payout)))
 		s.mutex.Unlock()
 		if err != nil {
@@ -178,11 +148,7 @@ func (s *Server) handleInfo() http.HandlerFunc {
 }
 
 func (s *Server) handleLastRequest() http.HandlerFunc {
-<<<<<<< HEAD
 	type info struct {
-=======
-	type request struct {
->>>>>>> origin/main
 		Github            string `json:"github"`
 		LastRequestedTime int64  `json:"last_requested_time"`
 	}
@@ -197,31 +163,13 @@ func (s *Server) handleLastRequest() http.HandlerFunc {
 			http.Error(w, "Empty github name", http.StatusInternalServerError)
 			return
 		}
-
-		req, err := s.requestStore.Get(github)
-		if err != nil {
-			if err.Error() == "pg: no rows in result set" {
-				http.Error(w, "Account not found", http.StatusNotFound)
-				return
-			}
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
 		// TODO: go to db and get row if no row return 0 if exists return requested time
 		lastRequestedTime := time.Now().Unix()
 
 		w.Header().Set("Content-Type", "application/json")
-<<<<<<< HEAD
 		json.NewEncoder(w).Encode(info{
 			Github:            github,
 			LastRequestedTime: lastRequestedTime,
 		})
-		fmt.Println("asdasdasdasdadas")
-=======
-		json.NewEncoder(w).Encode(request{
-			Github:            req.Github,
-			LastRequestedTime: req.RequestDate,
-		})
->>>>>>> origin/main
 	}
 }
