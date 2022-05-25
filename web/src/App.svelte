@@ -2,7 +2,6 @@
   import 'animate.css';
   import 'bulma/css/bulma.css';
   import Faucet from './Faucet.svelte';
-  import './tailwind.css';
 </script>
 
 <svelte:head>
