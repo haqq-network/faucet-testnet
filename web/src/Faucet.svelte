@@ -3,6 +3,7 @@
     onMount,
     afterUpdate,
     beforeUpdate,
+    onDestroy,
     setContext,
     getContext,
   } from 'svelte';
@@ -21,16 +22,12 @@
   import auth from './authService';
   import {
     isAuthenticated,
-    user,
-    user_tasks,
-    tasks,
-    isGithubAuth,
+    lastRequestedTime,
     githubUser,
+    isRequested,
   } from './store';
   import Icon from '@iconify/svelte';
   import Footer from './components/Footer.svelte';
-  import { toggle_class } from 'svelte/internal';
-  // import detectEthereumProvider from '@metamask/detect-provider';
 
   let auth0Client;
 
@@ -39,6 +36,9 @@
   $: balance = $connected ? $web3.eth.getBalance(checkAccount) : '';
 
   let address = null;
+  let github = null;
+  let countdown = null;
+  let unsubscribeRequestedTime = {};
   let faucetInfo = {
     account: '0x0000000000000000000000000000000000000000',
     network: 'testnet',
@@ -49,8 +49,12 @@
 
   // onMount hook
   onMount(async () => {
+    unsubscribeRequestedTime = lastRequestedTime.subscribe(handleRequestTime);
+    console.log(unsubscribeRequestedTime);
+    console.log($githubUser);
+    console.log($lastRequestedTime);
+    console.log($isRequested);
     if (localStorage.getItem('metaMaskConnected')) {
-      console.log('kek');
       await defaultEvmStores.setProvider();
       auth0Client = await auth.createClient();
     }
@@ -59,24 +63,72 @@
       githubUser.set(await auth0Client.getUser());
       isAuthenticated.set(await auth0Client.isAuthenticated());
     }
-    const response = await fetch(
-      `http://localhost:8080/api/requested?github=${await $githubUser.nickname}`
-    );
-    console.log(response, '<------------ response');
-    console.log($githubUser, '<------------ githubUser');
+    if ($githubUser?.nickname) {
+      const response = await fetch(
+        `/api/requested?github=${$githubUser?.nickname}`
+      );
+      const claimInfo = await response.json();
+      lastRequestedTime.set(claimInfo.last_requested_time);
+      if ($lastRequestedTime > 0) isRequested.set(true);
+      // const res = await fetch('/api/info');
+      // faucetInfo = await res.json();
+    }
+  });
 
-    // const res = await fetch('/api/info');
-    // faucetInfo = await res.json();
+  // onDestroy hook
+  onDestroy(() => {
+    countdown ?? clearInterval(countdown);
+    unsubscribeRequestedTime();
   });
 
   // afterUpdate hook
   afterUpdate(async () => {
+    unsubscribeRequestedTime = lastRequestedTime.subscribe(handleRequestTime);
+    console.log($githubUser, 'afterUpdate');
+    console.log($lastRequestedTime, 'afterUpdate');
+    console.log($isRequested, 'afterUpdate');
     if (localStorage.getItem('metamaskWallet') !== (await userWallet())) {
       localStorage.setItem('metamaskWallet', await userWallet());
     }
+    if ($githubUser?.nickname) {
+      try {
+        const response = await fetch(
+          `/api/requested?github=${$githubUser?.nickname}`
+        );
+        if (!response.ok) {
+          const text = await response.text();
+          throw new Error(text);
+        }
+        const claimInfo = await response.json();
+        lastRequestedTime.set(claimInfo.last_requested_time);
+        if ($lastRequestedTime > 0) isRequested.set(true);
+      } catch (error) {
+        console.log(error.message);
+      }
+    }
   });
 
-  //connect metamask wallet
+  // countdown timer
+  const handleRequestTime = () => {
+    if (!$lastRequestedTime) {
+      return;
+    }
+    const nextClaimTime = $lastRequestedTime + 60 * 60 * 24;
+    countdown = setInterval(() => {
+      let currentTime = Math.floor(new Date().getTime() / 1000);
+      const timer = nextClaimTime - currentTime;
+      if (timer > 0) {
+        document.getElementById('timer').innerText = `${toHHMMSS(timer)}`;
+        isRequested.set(true);
+      } else {
+        document.getElementById('timer').innerText = '';
+        isRequested.set(false);
+        clearInterval(countdown);
+      }
+    }, 1000);
+  };
+
+  // connect metamask wallet
   const enableBrowser = async () => {
     await defaultEvmStores.setProvider();
     localStorage.setItem('metamaskWallet', await userWallet());
@@ -117,23 +169,72 @@
     return wallet;
   };
 
+  // request tokens
   async function handleRequest() {
     try {
       address = getAddress(checkAccount);
+      github = $githubUser?.nickname;
+      let formData = new FormData();
+      formData.append('address', address);
+      formData.append('github', github);
+      const response = await fetch('http://localhost:8080/api/claim', {
+        method: 'POST',
+        body: formData,
+      });
+      console.log(...formData);
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(text);
+      } else {
+        isRequested.set(true);
+        bulmaToast.toast({
+          duration: 3000,
+          message: 'User received 1 ISLM',
+          position: 'bottom-right',
+          type: 'is-success',
+          dismissible: true,
+          pauseOnHover: true,
+          closeOnClick: false,
+          animate: { in: 'fadeIn', out: 'fadeOut' },
+        });
+      }
     } catch (error) {
-      toast({ message: error.reason, type: 'is-warning' });
+      bulmaToast.toast({
+        duration: 3000,
+        message: error.message,
+        position: 'bottom-right',
+        type: 'is-danger',
+        dismissible: true,
+        pauseOnHover: true,
+        closeOnClick: false,
+        animate: { in: 'fadeIn', out: 'fadeOut' },
+      });
+      console.log(error);
       return;
     }
-    let formData = new FormData();
-    formData.append('address', address);
-    const res = await fetch('/api/claim', {
-      method: 'POST',
-      body: formData,
-    });
-    let message = await res.text();
-    let type = res.ok ? 'is-success' : 'is-warning';
-    toast({ message, type });
+
+    // let message = await res.text();
+    // let type = res.ok ? 'is-success' : 'is-warning';
+    // toast({ message, type });
   }
+
+  // unix-timestamp to hh:mm:ss
+  const toHHMMSS = (number) => {
+    let sec_num = parseInt(number, 10);
+    let hours = Math.floor(sec_num / 3600);
+    let minutes = Math.floor((sec_num - hours * 3600) / 60);
+    let seconds = sec_num - hours * 3600 - minutes * 60;
+    if (hours < 10) {
+      hours = '0' + hours;
+    }
+    if (minutes < 10) {
+      minutes = '0' + minutes;
+    }
+    if (seconds < 10) {
+      seconds = '0' + seconds;
+    }
+    return hours + ':' + minutes + ':' + seconds;
+  };
 
   function capitalize(str) {
     const lower = str.toLowerCase();
@@ -168,6 +269,8 @@
     localStorage.removeItem('githubUser');
     localStorage.removeItem('githubConnected');
     githubUser.set({});
+    isRequested.set(false);
+    lastRequestedTime(null);
   }
 
   // toggle dropdown button
@@ -279,24 +382,6 @@
       );
     }
   }
-
-  // const account = window.ethereum;
-  // const accountInterval = setInterval(function () {
-  //   if (window.ethereum?.accounts[0] !== account) {
-  //     account = window.ethereum?.accounts[0];
-  //     updateInterface();
-  //   }
-  // }, 100);
-  // ethereum.request({ method: 'eth_requestAccounts' });
-  // const provider = await detectEthereumProvider();
-
-  // if (provider) {
-  //   // From now on, this should always be true:
-  //   // provider === window.ethereum
-  //   startApp(provider); // initialize your app
-  // } else {
-  //   console.log('Please install MetaMask!');
-  // }
 </script>
 
 <main>
@@ -464,13 +549,15 @@
             </p> -->
 
           <div>
-            {#if $isAuthenticated && $connected && window.ethereum.chainId === '0x2be3'}
+            {#if $isAuthenticated && $connected && window.ethereum.chainId === '0x2be3' && !$isRequested}
               <button
                 on:click={handleRequest}
                 class="button is-medium connect "
               >
                 Request Tokens
               </button>
+            {:else}
+              <div id="timer" />
             {/if}
           </div>
         </div>

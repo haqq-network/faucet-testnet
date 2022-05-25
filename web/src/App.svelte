@@ -24,12 +24,6 @@
     href="https://fonts.googleapis.com/css2?family=Inter&display=swap"
     rel="stylesheet"
   />
-  <script
-    type="module"
-    src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.esm.js"></script>
-  <script
-    nomodule
-    src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.js"></script>
 </svelte:head>
 
 <Faucet />
