@@ -1,23 +1,13 @@
 <script>
-  import {
-    onMount,
-    afterUpdate,
-    beforeUpdate,
-    onDestroy,
-    setContext,
-    getContext,
-  } from 'svelte';
+  import { onMount, afterUpdate, onDestroy } from 'svelte';
   import { getAddress } from '@ethersproject/address';
   import * as bulmaToast from 'bulma-toast';
   import 'animate.css';
   import {
-    chainData,
     connected,
     defaultEvmStores,
     selectedAccount,
-    chainId,
     web3,
-    allChainsData,
   } from 'svelte-web3';
   import auth from './authService';
   import {
@@ -29,12 +19,11 @@
   import Icon from '@iconify/svelte';
   import Footer from './components/Footer.svelte';
 
-  let auth0Client;
-
   $: checkAccount =
     $selectedAccount || '0x0000000000000000000000000000000000000000';
   $: balance = $connected ? $web3.eth.getBalance(checkAccount) : '';
 
+  let auth0Client;
   let address = null;
   let github = null;
   let countdown = null;
@@ -50,10 +39,6 @@
   // onMount hook
   onMount(async () => {
     unsubscribeRequestedTime = lastRequestedTime.subscribe(handleRequestTime);
-    console.log(unsubscribeRequestedTime);
-    console.log($githubUser);
-    console.log($lastRequestedTime);
-    console.log($isRequested);
     if (localStorage.getItem('metaMaskConnected')) {
       await defaultEvmStores.setProvider();
       auth0Client = await auth.createClient();
@@ -64,14 +49,18 @@
       isAuthenticated.set(await auth0Client.isAuthenticated());
     }
     if ($githubUser?.nickname) {
-      const response = await fetch(
-        `/api/requested?github=${$githubUser?.nickname}`
-      );
-      const claimInfo = await response.json();
-      lastRequestedTime.set(claimInfo.last_requested_time);
-      if ($lastRequestedTime > 0) isRequested.set(true);
-      // const res = await fetch('/api/info');
-      // faucetInfo = await res.json();
+      try {
+        const response = await fetch(
+          `/api/requested?github=${$githubUser?.nickname}`
+        );
+        const claimInfo = await response.json();
+        lastRequestedTime.set(claimInfo.last_requested_time);
+        if ($lastRequestedTime > 0) isRequested.set(true);
+        // const res = await fetch('/api/info');
+        // faucetInfo = await res.json();
+      } catch (error) {
+        console.log(error);
+      }
     }
   });
 
@@ -84,9 +73,6 @@
   // afterUpdate hook
   afterUpdate(async () => {
     unsubscribeRequestedTime = lastRequestedTime.subscribe(handleRequestTime);
-    console.log($githubUser, 'afterUpdate');
-    console.log($lastRequestedTime, 'afterUpdate');
-    console.log($isRequested, 'afterUpdate');
     if (localStorage.getItem('metamaskWallet') !== (await userWallet())) {
       localStorage.setItem('metamaskWallet', await userWallet());
     }
@@ -103,7 +89,7 @@
         lastRequestedTime.set(claimInfo.last_requested_time);
         if ($lastRequestedTime > 0) isRequested.set(true);
       } catch (error) {
-        console.log(error.message);
+        console.log(error);
       }
     }
   });
@@ -181,7 +167,6 @@
         method: 'POST',
         body: formData,
       });
-      console.log(...formData);
       if (!response.ok) {
         const text = await response.text();
         throw new Error(text);
@@ -273,11 +258,6 @@
     lastRequestedTime(null);
   }
 
-  // toggle dropdown button
-  function toggle() {
-    document.querySelector('.dropdown').classList.toggle('is-active');
-  }
-
   // hide metamask middle symbols
   const hideAddress = async () => {
     let result = await userWallet();
@@ -293,7 +273,7 @@
         // check if the chain to connect to is installed
         await window.ethereum.request({
           method: 'wallet_switchEthereumChain',
-          // chainId must be in hexadecimal numbers, hardcoded rn
+          // chainId must be in hexadecimal numbers, hardcoded rn to haqqNetwork
           params: [{ chainId: '0x2BE3' }],
         });
         bulmaToast.toast({
@@ -364,7 +344,7 @@
             });
           }
         }
-        // console.error(error);
+        console.error(error);
         bulmaToast.toast({
           message: error,
           position: 'bottom-right',
@@ -386,6 +366,7 @@
 
 <main>
   <section class="hero is-info is-fullheight ">
+    <!-- <Header /> -->
     <div class="hero-head">
       <nav class="navbar">
         <div class="navbar-brand">

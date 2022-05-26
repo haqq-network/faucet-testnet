@@ -1,11 +1,5 @@
 import createAuth0Client from '@auth0/auth0-spa-js';
-import {
-  user,
-  isAuthenticated,
-  popupOpen,
-  isGithubAuth,
-  githubUser,
-} from './store';
+import { isAuthenticated, popupOpen, isGithubAuth, githubUser } from './store';
 import config from '../auth_config';
 import * as bulmaToast from 'bulma-toast';
 
@@ -19,7 +13,6 @@ async function createClient() {
 
 async function githubData(auth0Client) {
   const data = await auth0Client?.getUser();
-  console.log(data, '<------- iz auth servisaa');
   return data || {};
 }
 
