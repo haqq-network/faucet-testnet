@@ -287,7 +287,6 @@
           try {
             await window.ethereum.request({
               // ACTUAL NETWORK SETUP FROM https://islamiccoin.net/metamask-instruction
-
               method: 'wallet_addEthereumChain',
               params: [
                 {
