@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/go-pg/pg"
 	"github.com/haqq-network/faucet-testnet/database"
+	"github.com/spf13/viper"
 	"net/http"
 	"strconv"
 	"time"
@@ -24,13 +25,13 @@ const GithubKey string = "github"
 type Server struct {
 	chain.TxBuilder
 	mutex        trylock.Mutex
-	cfg          *Config
+	cfg          Config
 	queue        chan string
 	requestStore *database.RequestStore
 	db           *pg.DB
 }
 
-func NewServer(builder chain.TxBuilder, cfg *Config) *Server {
+func NewServer(builder chain.TxBuilder) *Server {
 
 	db, err := database.DBConn()
 	if err != nil {
@@ -39,6 +40,14 @@ func NewServer(builder chain.TxBuilder, cfg *Config) *Server {
 	}
 
 	requestStore := database.NewRequestStore(db)
+
+	cfg := Config{
+		httpPort:   viper.GetInt("httpPort"),
+		interval:   viper.GetInt("interval"),
+		payout:     viper.GetInt("payout"),
+		proxyCount: viper.GetInt("proxyCount"),
+		queueCap:   viper.GetInt("queueCap"),
+	}
 	return &Server{
 		TxBuilder:    builder,
 		cfg:          cfg,
@@ -153,7 +162,6 @@ func (s *Server) handleClaim() http.HandlerFunc {
 func (s *Server) handleInfo() http.HandlerFunc {
 	type info struct {
 		Account string `json:"account"`
-		Network string `json:"network"`
 		Payout  string `json:"payout"`
 	}
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -165,7 +173,6 @@ func (s *Server) handleInfo() http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(info{
 			Account: s.Sender().String(),
-			Network: s.cfg.network,
 			Payout:  strconv.Itoa(s.cfg.payout),
 		})
 	}

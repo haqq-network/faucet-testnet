@@ -8,26 +8,28 @@ RUN npm install
 COPY ./web .
 RUN npm run build
 
-FROM golang:1.16-alpine as backend
+FROM golang AS builder
 
-RUN apk add --no-cache gcc musl-dev linux-headers
-
-WORKDIR /backend-build
-
-COPY go.* ./
+WORKDIR /src
+# Download dependencies
+COPY go.mod go.sum /
 RUN go mod download
 
+# Add source code
 COPY . .
 COPY --from=frontend /frontend-build/public ./web/public
 
-RUN go build -o faucet-testnet -ldflags "-s -w"
+RUN CGO_ENABLED=0 go build -o main .
 
-FROM alpine
+# Multi-Stage production build
+FROM alpine AS production
+RUN apk --no-cache add ca-certificates
 
-RUN apk add --no-cache ca-certificates
-
-COPY --from=backend /backend-build/faucet-testnet /app/faucet-testnet
-
+WORKDIR /app
+# Retrieve the binary from the previous stage
+COPY --from=builder /src/main .
+# Expose port
 EXPOSE 8080
-
-ENTRYPOINT ["/app/faucet-testnet"]
+# Set the binary as the entrypoint of the container
+CMD ["./main", "migrate"]
+CMD ["./main", "serve"]

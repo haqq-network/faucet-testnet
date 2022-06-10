@@ -1,91 +1,101 @@
 package cmd
 
 import (
-	"crypto/ecdsa"
-	"errors"
-	"flag"
 	"fmt"
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/haqq-network/faucet-testnet/internal/chain"
+	"github.com/haqq-network/faucet-testnet/internal/server"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"math/big"
 	"os"
 	"os/signal"
-	"strings"
-
-	"github.com/joho/godotenv"
-
-	"github.com/ethereum/go-ethereum/crypto"
-
-	"github.com/haqq-network/faucet-testnet/internal/chain"
-	"github.com/haqq-network/faucet-testnet/internal/server"
-)
-
-var (
-	appVersion = "v1.1.0"
-	chainIDMap = map[string]int{"ropsten": 3, "rinkeby": 4, "goerli": 5, "kovan": 42}
-
-	httpPortFlag = flag.Int("httpport", 8080, "Listener port to serve HTTP connection")
-	proxyCntFlag = flag.Int("proxycount", 0, "Count of reverse proxies in front of the server")
-	queueCapFlag = flag.Int("queuecap", 100, "Maximum transactions waiting to be sent")
-	versionFlag  = flag.Bool("version", false, "Print version number")
-
-	payoutFlag   = flag.Int("faucet.amount", 1, "Number of Ethers to transfer per user request")
-	intervalFlag = flag.Int("faucet.minutes", 1440, "Number of minutes to wait between funding rounds")
-	netnameFlag  = flag.String("faucet.name", "testnet", "Network name to display on the frontend")
-
-	keyJSONFlag  = flag.String("wallet.keyjson", os.Getenv("KEYSTORE"), "Keystore file to fund user requests with")
-	keyPassFlag  = flag.String("wallet.keypass", "password.txt", "Passphrase text file to decrypt keystore")
-	privKeyFlag  = flag.String("wallet.privkey", os.Getenv("PRIVATE_KEY"), "Private key hex to fund user requests with")
-	providerFlag = flag.String("wallet.provider", os.Getenv("WEB3_PROVIDER"), "Endpoint for Ethereum JSON-RPC connection")
 )
 
 func init() {
-	flag.Parse()
-	if *versionFlag {
-		fmt.Println(appVersion)
-		os.Exit(0)
-	}
+	RootCmd.AddCommand(serveCmd)
+
+	// Here you will define your flags and configuration settings.
+	viper.SetDefault("httpport", 8080)
+	viper.SetDefault("proxycount", 0)
+	viper.SetDefault("queuecap", 100)
+	viper.SetDefault("amount", 1)
+	viper.SetDefault("interval", 1440)
+	viper.SetDefault("chainID", 11235)
 }
 
-func Execute() {
-	if err := godotenv.Load(); err != nil {
-		panic(fmt.Errorf("Failed to load the env vars: %v", err))
-	}
+// serveCmd represents the serve command
+var serveCmd = &cobra.Command{
+	Use:   "serve",
+	Short: "start http server with configured api",
+	Long:  `Starts a http server and serves the configured api`,
+	Run: func(cmd *cobra.Command, args []string) {
 
-	privateKey, err := getPrivateKeyFromFlags()
-	if err != nil {
-		panic(fmt.Errorf("failed to read private key: %w", err))
-	}
-	var chainID *big.Int
-	if value, ok := chainIDMap[strings.ToLower(*netnameFlag)]; ok {
-		chainID = big.NewInt(int64(value))
-	}
+		privateKey, err := crypto.HexToECDSA(os.Getenv("PRIVATE_KEY"))
+		if err != nil {
+			panic(fmt.Errorf("failed to read private key: %w", err))
+		}
 
-	txBuilder, err := chain.NewTxBuilder(os.Getenv("WEB3_PROVIDER"), privateKey, chainID)
-	if err != nil {
-		panic(fmt.Errorf("cannot connect to web3 provider: %w", err))
-	}
-	config := server.NewConfig(*netnameFlag, *httpPortFlag, *intervalFlag, *payoutFlag, *proxyCntFlag, *queueCapFlag)
-	go server.NewServer(txBuilder, config).Run()
+		txBuilder, err := chain.NewTxBuilder(os.Getenv("WEB3_PROVIDER"), privateKey, big.NewInt(viper.GetInt64("chainID")))
+		if err != nil {
+			panic(fmt.Errorf("cannot connect to web3 provider: %w", err))
+		}
 
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt)
-	<-c
+		go server.NewServer(txBuilder).Run()
+
+		c := make(chan os.Signal, 1)
+		signal.Notify(c, os.Interrupt)
+		<-c
+	},
 }
 
-func getPrivateKeyFromFlags() (*ecdsa.PrivateKey, error) {
-	if os.Getenv("PRIVATE_KEY") != "" {
-		return crypto.HexToECDSA(os.Getenv("PRIVATE_KEY"))
-	} else if *keyJSONFlag == "" {
-		return nil, errors.New("missing private key or keystore")
-	}
+//package cmd
+//
+//import (
+//	"crypto/ecdsa"
+//	"errors"
+//	"flag"
+//	"fmt"
+//	"math/big"
+//	"os"
+//	"os/signal"
+//	"strings"
+//
+//	"github.com/joho/godotenv"
+//
+//	"github.com/ethereum/go-ethereum/crypto"
+//
+//	"github.com/haqq-network/faucet-testnet/internal/chain"
+//	"github.com/haqq-network/faucet-testnet/internal/server"
+//)
+//
 
-	keyfile, err := chain.ResolveKeyfilePath(*keyJSONFlag)
-	if err != nil {
-		return nil, err
-	}
-	password, err := os.ReadFile(*keyPassFlag)
-	if err != nil {
-		return nil, err
-	}
+//
 
-	return chain.DecryptKeyfile(keyfile, strings.TrimRight(string(password), "\r\n"))
-}
+//
+//func Execute() {
+//	if err := godotenv.Load(); err != nil {
+//		panic(fmt.Errorf("Failed to load the env vars: %v", err))
+//	}
+//
+//	privateKey, err := getPrivateKeyFromFlags()
+//	if err != nil {
+//		panic(fmt.Errorf("failed to read private key: %w", err))
+//	}
+//	var chainID *big.Int
+//	if value, ok := chainIDMap[strings.ToLower(*netnameFlag)]; ok {
+//		chainID = big.NewInt(int64(value))
+//	}
+//
+//	txBuilder, err := chain.NewTxBuilder(os.Getenv("WEB3_PROVIDER"), privateKey, chainID)
+//	if err != nil {
+//		panic(fmt.Errorf("cannot connect to web3 provider: %w", err))
+//	}
+//	config := server.NewConfig(*netnameFlag, *httpPortFlag, *intervalFlag, *payoutFlag, *proxyCntFlag, *queueCapFlag)
+//	go server.NewServer(txBuilder, config).Run()
+//
+//	c := make(chan os.Signal, 1)
+//	signal.Notify(c, os.Interrupt)
+//	<-c
+//}
+//

@@ -1,0 +1,33 @@
+version: "3.8"
+
+volumes:
+  postgres:
+
+services:
+  server:
+    build:
+      context: .
+    depends_on:
+      - postgres
+    ports:
+      - 8080:8080
+    environment:
+      PORT: 8080
+      DB_ADDR: postgres:5432
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_DATABASE: postgres
+      PRIVATE_KEY:
+      WEB3_PROVIDER: http://34.159.174.117:8545
+
+
+
+  postgres:
+    image: postgres:13
+    restart: unless-stopped
+    ports:
+      - 5432:5432
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    environment:
+      POSTGRES_PASSWORD: postgres
