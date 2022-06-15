@@ -1,0 +1,57 @@
+name: Deploy with werf
+on:
+  push:
+    branches:
+      - testedge
+
+  workflow_dispatch:
+
+jobs:
+  testedge:
+    runs-on: ubuntu-latest
+    environment: testedge
+
+    env:
+      WERF_REPO: europe-west4-docker.pkg.dev/testedge-7079/haqq/faucet
+
+    concurrency:
+      group: testedge-haqq-faucet
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+        # to have a clean git repo, not polluted with google credentials file
+        with:
+          path: repo
+
+      - id: 'auth'
+        name: 'Authenticate to GCP'
+        uses: 'google-github-actions/auth@v0.4.4'
+        with:
+          create_credentials_file: 'true'
+          workload_identity_provider: 'projects/584818072229/locations/global/workloadIdentityPools/github-pool-7813/providers/github-provider'
+          service_account: 'github-actions@testedge-7079.iam.gserviceaccount.com'
+
+      - id: 'gcloud'
+        name: 'gcloud'
+        run: |-
+          gcloud auth login --brief --cred-file="${{ steps.auth.outputs.credentials_file_path }}"
+          gcloud auth configure-docker europe-west4-docker.pkg.dev
+          gcloud container clusters get-credentials haqq --region europe-west4
+
+      - name: Install werf CLI
+        uses: werf/actions/install@v1.2
+
+      - name: Converge
+        id: 'converge'
+        env:
+          WERF_ENV: testedge
+        run: |-
+          date
+          cd repo
+          date
+          werf converge --auto-rollback=true --log-debug

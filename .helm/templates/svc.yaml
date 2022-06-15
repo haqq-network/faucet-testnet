@@ -1,0 +1,56 @@
+---
+
+apiVersion: networking.gke.io/v1
+kind: ManagedCertificate
+metadata:
+  name: faucet-cert
+spec:
+  domains:
+    - testedge.haqq.network
+
+---
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: testedge-ingress
+  annotations:
+    kubernetes.io/ingress.global-static-ip-name: testedge-address
+    networking.gke.io/managed-certificates: testedge-cert
+    kubernetes.io/ingress.class: "gce"
+spec:
+  defaultBackend:
+    service:
+      name: testedge-svc
+      port:
+        number: 8080
+
+---
+
+apiVersion: cloud.google.com/v1
+kind: BackendConfig
+metadata:
+  name: testedge-backendconfig
+spec:
+  securityPolicy:
+    name: "policy"
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: testedge-svc
+  labels:
+    app: faucet
+  annotations:
+    cloud.google.com/backend-config: '{"default": "testedge-backendconfig"}'
+spec:
+  type: "NodePort"
+  selector:
+    app: faucet
+  ports:
+    - name: web
+      protocol: TCP
+      port: 8080
+      targetPort: 8080

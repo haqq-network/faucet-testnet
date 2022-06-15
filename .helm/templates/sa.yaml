@@ -1,0 +1,6 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ .Values.google_sa_name }}
+  annotations:
+    iam.gke.io/gcp-service-account: "{{ .Values.google_sa_name }}@{{ .Values.google_project_id }}.iam.gserviceaccount.com"

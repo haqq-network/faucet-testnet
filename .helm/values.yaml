@@ -1,0 +1,4 @@
+google_project_id: testedge-7079
+google_sa_name: sa-haqq-faucet
+
+ethereum_jsonrpc_http_url: "https://rpc.eth.testedge.haqq.network"
