@@ -11,7 +11,7 @@ import (
 
 // DBConn returns a postgres connection pool.
 func DBConn() (*pg.DB, error) {
-	viper.SetDefault("db_url", "jdbc:postgresql://localhost:5432/postgres")
+	viper.SetDefault("db_url", "postgres://postgres:postgres@localhost:15434/postgres?sslmode=disable")
 
 	opt, err := pg.ParseURL(viper.GetString("db_url"))
 	if err != nil {
