@@ -36,7 +36,7 @@ spec:
             - name: PRIVATE_KEY
               value: gcp:secretmanager:projects/{{ .Values.google_project_id }}/secrets/FAUCET_PRIVATE_KEY
             - name: PORT
-              value: 8080
+              value: "8080"
             - name: WEB3_PROVIDER
               value: {{ .Values.ethereum_jsonrpc_http_url }}
           command:
