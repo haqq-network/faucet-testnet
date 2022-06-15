@@ -29,7 +29,7 @@ spec:
       serviceAccountName: {{ .Values.google_sa_name }}
       containers:
         - name: faucet
-          image: {{ index .Values.werf.image "faucet" }}
+          image: {{ index .Values.werf.image "haqq-faucet" }}
           env:
             - name: DATABASE_URL
               value: gcp:secretmanager:projects/{{ .Values.google_project_id }}/secrets/FAUCET_DATABASE_URI
