@@ -1,6 +1,6 @@
 configVersion: 1
-project: faucet
+project: haqq-faucet
 ---
-image: faucet
+image: haqq-faucet
 dockerfile: Dockerfile
 
