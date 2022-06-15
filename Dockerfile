@@ -31,5 +31,7 @@ COPY --from=builder /src/main .
 # Expose port
 EXPOSE 8080
 # Set the binary as the entrypoint of the container
-CMD ["./main", "migrate"]
-CMD ["./main", "serve"]
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+ENTRYPOINT ["/entrypoint.sh"]
