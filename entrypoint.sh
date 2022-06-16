@@ -2,8 +2,7 @@
 
 set -x
 
-/app/main init
-/app/main migrate
+/app/main migrate init
 /app/main serve
 
 # exec "$@"
