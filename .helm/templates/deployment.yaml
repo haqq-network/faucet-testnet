@@ -31,7 +31,7 @@ spec:
         - name: faucet
           image: {{ index .Values.werf.image "haqq-faucet" }}
           env:
-            - name: DATABASE_URL
+            - name: DB_URL
               value: gcp:secretmanager:projects/{{ .Values.google_project_id }}/secrets/FAUCET_DATABASE_URI
             - name: PRIVATE_KEY
               value: gcp:secretmanager:projects/{{ .Values.google_project_id }}/secrets/FAUCET_PRIVATE_KEY
