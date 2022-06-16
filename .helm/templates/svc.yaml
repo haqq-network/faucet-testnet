@@ -33,7 +33,7 @@ metadata:
   name: faucet-backendconfig
 spec:
   securityPolicy:
-    name: "policy"
+    name: "faucet-policy"
 
 ---
 
