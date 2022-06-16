@@ -36,6 +36,16 @@
 
   $: document.title = `ISLM ${capitalize(faucetInfo.network)} Faucet`;
 
+  // default settings for popUps
+  bulmaToast.setDefaults({
+    duration: 1500,
+    position: 'bottom-right',
+    dismissible: true,
+    pauseOnHover: true,
+    closeOnClick: false,
+    animate: { in: 'fadeIn', out: 'fadeOut' },
+  });
+
   // onMount hook
   onMount(async () => {
     unsubscribeRequestedTime = lastRequestedTime.subscribe(handleRequestTime);
@@ -53,13 +63,21 @@
         const response = await fetch(
           `/api/requested?github=${$githubUser?.nickname}`
         );
-        const claimInfo = await response.json();
+        const claimInfo = await response?.json();
+        let currentTime = Math.floor(new Date().getTime() / 1000);
+        let nextClaimTime = claimInfo.last_requested_time + 60 * 60 * 24;
         lastRequestedTime.set(claimInfo.last_requested_time);
-        if ($lastRequestedTime > 0) isRequested.set(true);
+        currentTime >= nextClaimTime
+          ? isRequested.set(false)
+          : isRequested.set(true);
         // const res = await fetch('/api/info');
         // faucetInfo = await res.json();
       } catch (error) {
-        console.log(error);
+        bulmaToast.toast({
+          message: error.message,
+          type: 'is-danger',
+        });
+        // console.log(error);
       }
     }
   });
@@ -84,12 +102,21 @@
         if (!response.ok) {
           const text = await response.text();
           throw new Error(text);
+        } else {
+          const claimInfo = await response.json();
+          let currentTime = Math.floor(new Date().getTime() / 1000);
+          let nextClaimTime = claimInfo.last_requested_time + 60 * 60 * 24;
+          lastRequestedTime.set(claimInfo.last_requested_time);
+          currentTime >= nextClaimTime
+            ? isRequested.set(false)
+            : isRequested.set(true);
         }
-        const claimInfo = await response.json();
-        lastRequestedTime.set(claimInfo.last_requested_time);
-        if ($lastRequestedTime > 0) isRequested.set(true);
       } catch (error) {
-        console.log(error);
+        bulmaToast.toast({
+          message: error.message,
+          type: 'is-danger',
+        });
+        // console.log(error);
       }
     }
   });
@@ -107,9 +134,9 @@
         document.getElementById('timer').innerText = `${toHHMMSS(timer)}`;
         isRequested.set(true);
       } else {
-        document.getElementById('timer').innerText = '';
-        isRequested.set(false);
         clearInterval(countdown);
+        isRequested.set(false);
+        document.getElementById('timer').innerText = '';
       }
     }, 1000);
   };
@@ -121,14 +148,8 @@
     localStorage.setItem('metaMaskConnected', $connected);
     defaultEvmStores.setProvider();
     bulmaToast.toast({
-      duration: 1000,
       message: `${await userWallet()} connected successfully`,
-      position: 'bottom-right',
       type: 'is-success',
-      dismissible: true,
-      pauseOnHover: true,
-      closeOnClick: false,
-      animate: { in: 'fadeIn', out: 'fadeOut' },
     });
   };
 
@@ -138,14 +159,8 @@
     localStorage.removeItem('metamaskWallet');
     localStorage.removeItem('metaMaskConnected');
     bulmaToast.toast({
-      duration: 1000,
       message: 'Wallet disconected',
-      position: 'bottom-right',
       type: 'is-danger',
-      dismissible: true,
-      pauseOnHover: true,
-      closeOnClick: false,
-      animate: { in: 'fadeIn', out: 'fadeOut' },
     });
   };
 
@@ -169,35 +184,26 @@
       });
       if (!response.ok) {
         const text = await response.text();
+        bulmaToast.toast({
+          message: text,
+          type: 'is-danger',
+        });
         throw new Error(text);
       } else {
         isRequested.set(true);
         bulmaToast.toast({
-          duration: 3000,
           message: 'User received 1 ISLM',
-          position: 'bottom-right',
           type: 'is-success',
-          dismissible: true,
-          pauseOnHover: true,
-          closeOnClick: false,
-          animate: { in: 'fadeIn', out: 'fadeOut' },
         });
       }
     } catch (error) {
-      bulmaToast.toast({
-        duration: 3000,
-        message: error.message,
-        position: 'bottom-right',
-        type: 'is-danger',
-        dismissible: true,
-        pauseOnHover: true,
-        closeOnClick: false,
-        animate: { in: 'fadeIn', out: 'fadeOut' },
-      });
       console.log(error);
+      bulmaToast.toast({
+        message: error.message,
+        type: 'is-danger',
+      });
       return;
     }
-
     // let message = await res.text();
     // let type = res.ok ? 'is-success' : 'is-warning';
     // toast({ message, type });
@@ -236,14 +242,8 @@
       isAuthenticated.set(await auth0Client.isAuthenticated());
     } catch (error) {
       bulmaToast.toast({
-        duration: 3000,
         message: error.message,
-        position: 'bottom-right',
         type: 'is-danger',
-        dismissible: true,
-        pauseOnHover: true,
-        closeOnClick: false,
-        animate: { in: 'fadeIn', out: 'fadeOut' },
       });
     }
   }
@@ -278,12 +278,7 @@
         });
         bulmaToast.toast({
           message: `Switched to Polygon Mainnet successfully`,
-          position: 'bottom-right',
           type: 'is-primary',
-          dismissible: true,
-          pauseOnHover: true,
-          closeOnClick: false,
-          animate: { in: 'fadeIn', out: 'fadeOut' },
         });
       } catch (error) {
         // This error code indicates that the chain has not been added to MetaMask
@@ -292,7 +287,6 @@
           try {
             await window.ethereum.request({
               // ACTUAL NETWORK SETUP FROM https://islamiccoin.net/metamask-instruction
-
               method: 'wallet_addEthereumChain',
               params: [
                 {
@@ -335,24 +329,14 @@
           } catch (addError) {
             bulmaToast.toast({
               message: addError,
-              position: 'bottom-right',
               type: 'is-danger',
-              dismissible: true,
-              pauseOnHover: true,
-              closeOnClick: false,
-              animate: { in: 'fadeIn', out: 'fadeOut' },
             });
           }
         }
         console.error(error);
         bulmaToast.toast({
           message: error,
-          position: 'bottom-right',
           type: 'is-danger',
-          dismissible: true,
-          pauseOnHover: true,
-          closeOnClick: false,
-          animate: { in: 'fadeIn', out: 'fadeOut' },
         });
       }
     } else {
@@ -365,8 +349,8 @@
 </script>
 
 <main>
+  <!-- svelte-ignore a11y-missing-attribute -->
   <section class="hero is-info is-fullheight ">
-    <!-- <Header /> -->
     <div class="hero-head">
       <nav class="navbar">
         <div class="navbar-brand">
@@ -422,7 +406,7 @@
             <!-- DROPDOWN START -->
             <div class="dropdown is-hoverable is-right">
               <div class="dropdown-trigger">
-                <button
+                <a
                   class="button is-medium"
                   aria-haspopup="true"
                   aria-controls="dropdown-menu"
@@ -430,12 +414,12 @@
                   <span class="icon is-small">
                     <i class="fa fa-angle-down" aria-hidden="true" />
                   </span>
-                </button>
+                </a>
               </div>
               <div class="dropdown-menu" id="dropdown-menu" role="menu">
-                <div class="dropdown-content ">
+                <div class="dropdown-content p-1">
                   {#if $isAuthenticated}
-                    <button on:mousedown={logout} class="dropdown-item">
+                    <a on:click={logout} class="dropdown-item m-1">
                       {#if !$githubUser.picture}
                         <span> waiting for pic... </span>
                       {:else}
@@ -449,15 +433,15 @@
                         <i class="fa fa-github" />
                       </span>
                       <span> Logout </span>
-                    </button>
+                    </a>
                   {/if}
                   {#if window.ethereum && $connected}
-                    <button on:mousedown={disableBrowser} class="dropdown-item">
+                    <a on:click={disableBrowser} class="dropdown-item m-1">
                       <span class="icon">
                         <Icon icon="logos:metamask-icon" inline={true} />
                       </span>
                       <span> Disconnect Wallet </span>
-                    </button>
+                    </a>
                   {/if}
                 </div>
               </div>
@@ -472,19 +456,19 @@
       <div
         class=" has-text-weight-bold is-size-3 is-align-content-center glass"
       >
-        <div class="container p-6">
+        <div class="container p-5">
           {#if !window.ethereum}
-            <p class="control">
+            <div class="control">
               <button type="button" class="button connect is-medium">
                 <span class="icon">
                   <Icon icon="logos:metamask-icon" inline={true} />
                 </span>
                 <a href="https://metamask.io/download/"> Download Metamask </a>
               </button>
-            </p>
+            </div>
           {/if}
           {#if window.ethereum && !$connected}
-            <p class="control">
+            <div class="control">
               <button
                 on:click={enableBrowser}
                 class="button connect is-medium "
@@ -494,41 +478,34 @@
                 </span>
                 <span> Connect Wallet </span>
               </button>
-            </p>
+            </div>
           {/if}
 
-          {#if $connected && !$isAuthenticated}
-            <!-- CHAIN ID CHECK -->
-            <figure>
-              <button on:click={login} class="button connect is-medium m-1">
-                <span class="icon">
-                  <i class="fa fa-github" />
-                </span>
-                <span> Login </span>
-              </button>
-            </figure>
-          {/if}
           {#if window.ethereum?.chainId === '0x2be3' && $connected}
-            <figure>
-              Current network is Haqq Network
-              <!-- {$chainData.name} -->
-              <img
-                src="haqq.svg"
-                style="width: 300px;"
-                alt="Chain logo"
-                class="m-auto"
-              />
-            </figure>
-          {:else if window.ethereum?.chainId !== '0x2be3'}
-            <button class="button is-medium connect m-1" on:click={switchChain}>
-              Switch to TestNow
+            <div class="column">
+              You connected to Haqq Network
+              <figure>
+                <img src="haqq.svg" width="300" alt="haqqNetworkLogo" />
+              </figure>
+            </div>
+          {:else if window.ethereum?.chainId !== '0x2be3' && $connected}
+            <div class="column">
+              <button
+                class="button is-medium connect m-1"
+                on:click={switchChain}
+              >
+                Switch to TestNow
+              </button>
+            </div>
+          {/if}
+          {#if $connected && !$isAuthenticated}
+            <button on:click={login} class="button connect is-medium m-1">
+              <span class="icon">
+                <i class="fa fa-github" />
+              </span>
+              <span> Login </span>
             </button>
           {/if}
-          <!-- CHAIN ID CHECK -->
-          <!-- <p>
-              Selected account: {$selectedAccount || 'not defined'}
-            </p> -->
-
           <div>
             {#if $isAuthenticated && $connected && window.ethereum.chainId === '0x2be3' && !$isRequested}
               <button
@@ -537,9 +514,8 @@
               >
                 Request Tokens
               </button>
-            {:else}
-              <div id="timer" />
             {/if}
+            <div id="timer" />
           </div>
         </div>
       </div>
