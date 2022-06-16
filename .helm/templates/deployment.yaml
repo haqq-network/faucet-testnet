@@ -43,6 +43,7 @@ spec:
             - "/secrets-init/bin/secrets-init"
           args:
             - "--provider"
+            - "google"
             - "/entrypoint.sh"
           resources:
             requests:
