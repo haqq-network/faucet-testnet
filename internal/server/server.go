@@ -36,7 +36,6 @@ func NewServer(builder chain.TxBuilder) *Server {
 	db, err := database.DBConn()
 	if err != nil {
 		panic(err.Error())
-		return nil
 	}
 
 	requestStore := database.NewRequestStore(db)
