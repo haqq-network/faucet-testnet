@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e
 
-./main migrate
-./main serve
+/app/main migrate
+/app/main serve
 
 exec "$@"
