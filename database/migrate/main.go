@@ -2,8 +2,9 @@
 package migrate
 
 import (
-	"github.com/haqq-network/faucet-testnet/database"
 	"log"
+
+	"github.com/haqq-network/faucet-testnet/database"
 
 	"github.com/go-pg/migrations"
 	"github.com/go-pg/pg"

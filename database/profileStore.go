@@ -2,9 +2,10 @@ package database
 
 import (
 	"errors"
+	"time"
+
 	"github.com/go-pg/pg"
 	"github.com/haqq-network/faucet-testnet/models"
-	"time"
 )
 
 // RequestStore implements database operations for request management.
