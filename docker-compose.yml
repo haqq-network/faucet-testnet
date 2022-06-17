@@ -13,10 +13,7 @@ services:
       - 8080:8080
     environment:
       PORT: 8080
-      DB_ADDR: postgres:5432
-      DB_USER: postgres
-      DB_PASSWORD: postgres
-      DB_DATABASE: postgres
+      DB_URL: postgres://postgres:postgres@localhost:5434/postgres?sslmode=disable
       PRIVATE_KEY:
       WEB3_PROVIDER: http://34.159.174.117:8545
 

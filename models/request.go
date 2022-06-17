@@ -2,7 +2,7 @@
 package models
 
 import (
-	"github.com/go-ozzo/ozzo-validation"
+	validation "github.com/go-ozzo/ozzo-validation"
 )
 
 // Request holds specific application settings linked to an Account.

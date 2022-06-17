@@ -4,12 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/go-pg/pg"
-	"github.com/haqq-network/faucet-testnet/database"
-	"github.com/spf13/viper"
 	"net/http"
 	"strconv"
 	"time"
+
+	"github.com/go-pg/pg"
+	"github.com/haqq-network/faucet-testnet/database"
+	"github.com/spf13/viper"
 
 	"github.com/LK4D4/trylock"
 	log "github.com/sirupsen/logrus"
@@ -36,7 +37,6 @@ func NewServer(builder chain.TxBuilder) *Server {
 	db, err := database.DBConn()
 	if err != nil {
 		panic(err.Error())
-		return nil
 	}
 
 	requestStore := database.NewRequestStore(db)

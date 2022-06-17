@@ -2,9 +2,10 @@ package database
 
 import (
 	"errors"
+	"time"
+
 	"github.com/go-pg/pg"
 	"github.com/haqq-network/faucet-testnet/models"
-	"time"
 )
 
 // RequestStore implements database operations for request management.
@@ -32,12 +33,12 @@ func (s *RequestStore) Get(github string) (*models.Request, error) {
 // Insert a request with github id
 func (s *RequestStore) Insert(github string) (*models.Request, error) {
 	p := models.Request{Github: github}
-	count, err := s.db.Model(&p).
+	count, _ := s.db.Model(&p).
 		Where("github = ?", github).
 		SelectAndCount()
 	if count == 0 {
 		p = models.Request{Github: github, RequestDate: time.Now().Unix()}
-		_, err = s.db.Model(&p).Insert()
+		_, err := s.db.Model(&p).Insert()
 		return &p, err
 	}
 
@@ -45,9 +46,8 @@ func (s *RequestStore) Insert(github string) (*models.Request, error) {
 		p.RequestDate = time.Now().Unix()
 		err := s.Update(&p)
 		return &p, err
-	} else {
-		return nil, errors.New("account already requested tokens")
 	}
+	return nil, errors.New("account already requested tokens")
 }
 
 // Update updates profile.

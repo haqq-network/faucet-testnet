@@ -2,14 +2,15 @@ package cmd
 
 import (
 	"fmt"
+	"math/big"
+	"os"
+	"os/signal"
+
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/haqq-network/faucet-testnet/internal/chain"
 	"github.com/haqq-network/faucet-testnet/internal/server"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"math/big"
-	"os"
-	"os/signal"
 )
 
 func init() {
