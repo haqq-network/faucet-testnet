@@ -27,6 +27,7 @@
   let address = null;
   let github = null;
   let countdown = null;
+  let chainId = '0xcfdb'; // TODO: load from config
   let unsubscribeRequestedTime = {};
   let faucetInfo = {
     account: '0x0000000000000000000000000000000000000000',
@@ -266,6 +267,7 @@
 
   // detect and switch chain
   async function switchChain() {
+    console.log(window.ethereum?.chainId)
     // Check if MetaMask is installed
     // MetaMask injects the global API into window.ethereum
     if (window.ethereum) {
@@ -274,7 +276,7 @@
         await window.ethereum.request({
           method: 'wallet_switchEthereumChain',
           // chainId must be in hexadecimal numbers, hardcoded rn to haqqNetwork
-          params: [{ chainId: '0xCFDB' }],
+          params: [{ chainId: chainId }],
         });
         bulmaToast.toast({
           message: `Switched to Haqq Network Testnet successfully`,
@@ -290,7 +292,7 @@
               method: 'wallet_addEthereumChain',
               params: [
                 {
-                  chainId: '0xCFDB', //hexadecimal, 53211 decimal
+                  chainId: chainId, //hexadecimal, 53211 decimal
                   chainName: 'Haqq Network Testnet',
                   nativeCurrency: {
                     name: 'IslamicCoin',
@@ -456,14 +458,14 @@
             </div>
           {/if}
 
-          {#if window.ethereum?.chainId === '0xCFDB' && $connected}
+          {#if window.ethereum?.chainId === chainId && $connected}
             <div class="column">
               You connected to Haqq Network
               <figure>
                 <img src="haqq.svg" width="300" alt="haqqNetworkLogo" />
               </figure>
             </div>
-          {:else if window.ethereum?.chainId !== '0xCFDB' && $connected}
+          {:else if window.ethereum?.chainId !== chainId && $connected}
             <div class="column">
               <button
                 class="button is-medium connect m-1"
@@ -482,7 +484,7 @@
             </button>
           {/if}
           <div>
-            {#if $isAuthenticated && $connected && window.ethereum.chainId === '0xCFDB' && !$isRequested}
+            {#if $isAuthenticated && $connected && window.ethereum.chainId === chainId && !$isRequested}
               <button
                 on:click={handleRequest}
                 class="button is-medium connect "
