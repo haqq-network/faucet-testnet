@@ -26,7 +26,6 @@ const GithubKey string = "github"
 type Server struct {
 	chain.TxBuilder
 	mutex        trylock.Mutex
-	cfg          Config
 	queue        chan string
 	requestStore *database.RequestStore
 	db           *pg.DB
@@ -41,17 +40,9 @@ func NewServer(builder chain.TxBuilder) *Server {
 
 	requestStore := database.NewRequestStore(db)
 
-	cfg := Config{
-		httpPort:   viper.GetInt("httpPort"),
-		interval:   viper.GetInt("interval"),
-		payout:     viper.GetInt("payout"),
-		proxyCount: viper.GetInt("proxyCount"),
-		queueCap:   viper.GetInt("queueCap"),
-	}
 	return &Server{
 		TxBuilder:    builder,
-		cfg:          cfg,
-		queue:        make(chan string, cfg.queueCap),
+		queue:        make(chan string, viper.GetInt("queuecap")),
 		requestStore: requestStore,
 		db:           db,
 	}
@@ -62,7 +53,7 @@ func (s *Server) setupRouter() *http.ServeMux {
 
 	router.Handle("/", http.FileServer(web.Dist()))
 
-	limiter := NewLimiter(s.cfg.proxyCount, time.Duration(s.cfg.interval)*time.Minute)
+	limiter := NewLimiter(viper.GetInt("proxycount"), time.Duration(viper.GetInt("interval"))*time.Minute)
 	router.Handle("/api/claim", negroni.New(limiter, negroni.Wrap(s.handleClaim())))
 	router.Handle("/api/info", s.handleInfo())
 	router.Handle("/api/requested", s.handleLastRequest())
@@ -80,8 +71,8 @@ func (s *Server) Run() {
 
 	n := negroni.New(negroni.NewRecovery(), negroni.NewLogger())
 	n.UseHandler(s.setupRouter())
-	log.Infof("Starting http server %d", s.cfg.httpPort)
-	log.Fatal(http.ListenAndServe(":"+strconv.Itoa(s.cfg.httpPort), n))
+	log.Infof("Starting http server %d", viper.GetInt("httpport"))
+	log.Fatal(http.ListenAndServe(":"+strconv.Itoa(viper.GetInt("httpport")), n))
 }
 
 func (s *Server) consumeQueue() {
@@ -173,7 +164,7 @@ func (s *Server) handleInfo() http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(info{
 			Account: s.Sender().String(),
-			Payout:  strconv.Itoa(s.cfg.payout),
+			Payout:  strconv.Itoa(viper.GetInt("amount")),
 		})
 	}
 }
