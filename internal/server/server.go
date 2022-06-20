@@ -93,7 +93,8 @@ func (s *Server) consumeQueue() {
 	defer s.mutex.Unlock()
 	for len(s.queue) != 0 {
 		address := <-s.queue
-		txHash, err := s.Transfer(context.Background(), address, chain.EtherToWei(int64(s.cfg.payout)))
+		// TODO: get from config
+		txHash, err := s.Transfer(context.Background(), address, chain.EtherToWei(1))
 		if err != nil {
 			log.WithError(err).Error("Failed to handle transaction in the queue")
 		} else {
@@ -143,7 +144,8 @@ func (s *Server) handleClaim() http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		txHash, err := s.Transfer(ctx, address, chain.EtherToWei(int64(s.cfg.payout)))
+		// TODO: get from config
+		txHash, err := s.Transfer(ctx, address, chain.EtherToWei(int64(1)))
 		s.mutex.Unlock()
 		if err != nil {
 			log.WithError(err).Error("Failed to send transaction")
