@@ -178,7 +178,7 @@
       let formData = new FormData();
       formData.append('address', address);
       formData.append('github', github);
-      const response = await fetch('http://localhost:8080/api/claim', {
+      const response = await fetch('/api/claim', {
         method: 'POST',
         body: formData,
       });
@@ -355,7 +355,7 @@
       <nav class="navbar">
         <div class="navbar-brand">
           <a class="navbar-item" href=".">
-            <img src="logo.svg" width="150" alt="IslamicCoin" />
+            <img alt="IslamicCoin" src="logo.svg" width="150" />
           </a>
         </div>
         <div class="navbar-item navbar-end">
