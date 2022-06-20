@@ -274,10 +274,10 @@
         await window.ethereum.request({
           method: 'wallet_switchEthereumChain',
           // chainId must be in hexadecimal numbers, hardcoded rn to haqqNetwork
-          params: [{ chainId: '0x2BE3' }],
+          params: [{ chainId: '0xCFDB' }],
         });
         bulmaToast.toast({
-          message: `Switched to Polygon Mainnet successfully`,
+          message: `Switched to Haqq Network Testnet successfully`,
           type: 'is-primary',
         });
       } catch (error) {
@@ -290,41 +290,16 @@
               method: 'wallet_addEthereumChain',
               params: [
                 {
-                  chainId: '0x2BE3', //hexadecimal, 11235 decimal
-                  chainName: 'Haqq Network',
+                  chainId: '0xCFDB', //hexadecimal, 53211 decimal
+                  chainName: 'Haqq Network Testnet',
                   nativeCurrency: {
                     name: 'IslamicCoin',
-                    symbol: 'ISLM', // 2-6 characters long
+                    symbol: 'ISLMT', // 2-6 characters long
                     decimals: 18,
                   },
-                  rpcUrls: ['https://rpc.eth.haqq.network'],
+                  rpcUrls: ['https://rpc.eth.testedge.haqq.network/'],
                 },
               ],
-
-              // method: 'wallet_addEthereumChain',
-              // params: [
-              //   {
-              //     chainId: '0x89',
-              //     chainName: 'Polygon Mainnet',
-              //     nativeCurrency: {
-              //       name: 'MATIC',
-              //       symbol: 'MATIC', // 2-6 characters long
-              //       decimals: 18,
-              //     },
-              //     rpcUrls: [
-              //       'https://polygon-rpc.com',
-              //       'https://rpc-mainnet.matic.network',
-              //       'https://rpc-mainnet.maticvigil.com',
-              //       'https://rpc-mainnet.matic.quiknode.pro',
-              //       'https://matic-mainnet.chainstacklabs.com',
-              //       'https://matic-mainnet-full-rpc.bwarelabs.com',
-              //       'https://matic-mainnet-archive-rpc.bwarelabs.com',
-              //       'https://poly-rpc.gateway.pokt.network/',
-              //       'https://rpc.ankr.com/polygon',
-              //       'https://rpc-mainnet.maticvigil.com/',
-              //     ],
-              //   },
-              // ],
             });
           } catch (addError) {
             bulmaToast.toast({
@@ -481,14 +456,14 @@
             </div>
           {/if}
 
-          {#if window.ethereum?.chainId === '0x2be3' && $connected}
+          {#if window.ethereum?.chainId === '0xCFDB' && $connected}
             <div class="column">
               You connected to Haqq Network
               <figure>
                 <img src="haqq.svg" width="300" alt="haqqNetworkLogo" />
               </figure>
             </div>
-          {:else if window.ethereum?.chainId !== '0x2be3' && $connected}
+          {:else if window.ethereum?.chainId !== '0xCFDB' && $connected}
             <div class="column">
               <button
                 class="button is-medium connect m-1"
@@ -507,7 +482,7 @@
             </button>
           {/if}
           <div>
-            {#if $isAuthenticated && $connected && window.ethereum.chainId === '0x2be3' && !$isRequested}
+            {#if $isAuthenticated && $connected && window.ethereum.chainId === '0xCFDB' && !$isRequested}
               <button
                 on:click={handleRequest}
                 class="button is-medium connect "

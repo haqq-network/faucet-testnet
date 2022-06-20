@@ -22,7 +22,7 @@ func init() {
 	viper.SetDefault("queuecap", 100)
 	viper.SetDefault("amount", 1)
 	viper.SetDefault("interval", 1440)
-	viper.SetDefault("chainID", 11235)
+	viper.SetDefault("chainID", 53211)
 }
 
 // serveCmd represents the serve command
