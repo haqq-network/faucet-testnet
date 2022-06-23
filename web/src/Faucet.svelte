@@ -15,6 +15,7 @@
     lastRequestedTime,
     githubUser,
     isRequested,
+    loading,
   } from './store';
   import Icon from '@iconify/svelte';
   import Footer from './components/Footer.svelte';
@@ -49,6 +50,7 @@
 
   // onMount hook
   onMount(async () => {
+    console.log(await $web3?.eth?.getBalance($selectedAccount), 'afterUpdate');
     unsubscribeRequestedTime = lastRequestedTime.subscribe(handleRequestTime);
     if (localStorage.getItem('metaMaskConnected')) {
       await defaultEvmStores.setProvider();
@@ -61,9 +63,15 @@
     }
     if ($githubUser?.nickname) {
       try {
+        loading.set(true);
         const response = await fetch(
           `/api/requested?github=${$githubUser?.nickname}`
         );
+        loading.set(false);
+        if (!response.ok) {
+          const text = await response.text();
+          throw new Error(text);
+        }
         const claimInfo = await response?.json();
         let currentTime = Math.floor(new Date().getTime() / 1000);
         let nextClaimTime = claimInfo.last_requested_time + 60 * 60 * 24;
@@ -91,15 +99,19 @@
 
   // afterUpdate hook
   afterUpdate(async () => {
+    console.log(await $web3?.eth?.getBalance($selectedAccount), 'afterUpdate');
+    $web3.eth.getBalance($selectedAccount);
     unsubscribeRequestedTime = lastRequestedTime.subscribe(handleRequestTime);
     if (localStorage.getItem('metamaskWallet') !== (await userWallet())) {
       localStorage.setItem('metamaskWallet', await userWallet());
     }
     if ($githubUser?.nickname) {
+      // loading.set(true);
       try {
         const response = await fetch(
           `/api/requested?github=${$githubUser?.nickname}`
         );
+        // loading.set(false);
         if (!response.ok) {
           const text = await response.text();
           throw new Error(text);
@@ -117,7 +129,7 @@
           message: error.message,
           type: 'is-danger',
         });
-        // console.log(error);
+        console.log(error.message);
       }
     }
   });
@@ -267,7 +279,6 @@
 
   // detect and switch chain
   async function switchChain() {
-    console.log(window.ethereum?.chainId)
     // Check if MetaMask is installed
     // MetaMask injects the global API into window.ethereum
     if (window.ethereum) {
@@ -336,55 +347,30 @@
           </a>
         </div>
         <div class="navbar-item navbar-end">
-          <span>
-            <!-- {#if !window.ethereum}
-              <p class="control">
-                <button type="button" class="button connect is-medium">
-                  <span class="icon">
-                    <Icon icon="logos:metamask-icon" inline={true} />
-                  </span>
-                  <a href="https://metamask.io/download/">
-                    Download Metamask
-                  </a>
-                </button>
-              </p>
-            {/if} -->
-            {#if window.ethereum && $connected}
-              <div class="navbar-item ">
-                <div class="button is-link is-rounded is-hovered accountButton">
-                  {#await hideAddress()}
-                    <span> waiting... </span>
-                  {:then hiddenAddress}
-                    <Icon icon="logos:metamask-icon" inline={true} /> &nbsp
-                    {hiddenAddress} &nbsp
-                  {/await}
-                  <span> Balance: &nbsp</span>
-                  {#await balance}
-                    <span> waiting... </span>
-                  {:then value}
-                    <span>{$web3.utils.fromWei(value).substring(0, 5)}</span> &nbsp
-                  {/await}
-                  <span> ISLM </span>
-                </div>
-              </div>
-            {/if}
-          </span>
+          {#if window.ethereum && $connected}
+            <a class="button is-hovered is-link accountButton">
+              {#await hideAddress()}
+                <span> waiting... </span>
+              {:then hiddenAddress}
+                <Icon icon="logos:metamask-icon" inline={true} class="mr-1" />
+                <span class="mr-1">{hiddenAddress}</span>
+              {/await}
+              <span class="mr-1"> Balance: </span>
+              {#await balance}
+                <span> waiting... </span>
+              {:then value}
+                <span>{$web3.utils.fromWei(value).substring(0, 5)} ISLM</span> &nbsp
+              {/await}
+            </a>
+          {/if}
         </div>
         <div class="navbar-item">
-          <!-- {#if !$isAuthenticated}
-            <button on:click={login} class="button connect is-medium">
-              <span class="icon">
-                <i class="fa fa-github" />
-              </span>
-              <span> Login </span>
-            </button>
-          {/if} -->
           {#if $connected || $isAuthenticated}
             <!-- DROPDOWN START -->
             <div class="dropdown is-hoverable is-right">
               <div class="dropdown-trigger">
                 <a
-                  class="button is-medium"
+                  class="button dropdown-button p-"
                   aria-haspopup="true"
                   aria-controls="dropdown-menu"
                 >
@@ -397,26 +383,21 @@
                 <div class="dropdown-content p-1">
                   {#if $isAuthenticated}
                     <a on:click={logout} class="dropdown-item m-1">
-                      {#if !$githubUser.picture}
-                        <span> waiting for pic... </span>
-                      {:else}
-                        <img
-                          src={$githubUser.picture}
-                          alt="avatar"
-                          class="avatar icon"
-                        />
-                      {/if}
-                      <span class="icon">
-                        <i class="fa fa-github" />
-                      </span>
+                      <Icon
+                        icon="akar-icons:github-fill"
+                        inline={true}
+                        class="is-flex-direction-row is-align-content-center"
+                      />
                       <span> Logout </span>
                     </a>
                   {/if}
                   {#if window.ethereum && $connected}
                     <a on:click={disableBrowser} class="dropdown-item m-1">
-                      <span class="icon">
-                        <Icon icon="logos:metamask-icon" inline={true} />
-                      </span>
+                      <Icon
+                        icon="logos:metamask-icon"
+                        inline={true}
+                        class="is-flex-direction-row is-align-content-center"
+                      />
                       <span> Disconnect Wallet </span>
                     </a>
                   {/if}
@@ -475,25 +456,22 @@
               </button>
             </div>
           {/if}
-          {#if $connected && !$isAuthenticated}
-            <button on:click={login} class="button connect is-medium m-1">
+          {#if $connected && !$isAuthenticated && loading}
+            <div class="loading" />
+          {:else if $connected && !$isAuthenticated && !loading}
+            <button on:click={login} class="button connect is-medium m-1 ">
               <span class="icon">
                 <i class="fa fa-github" />
               </span>
               <span> Login </span>
             </button>
-          {/if}
-          <div>
-            {#if $isAuthenticated && $connected && window.ethereum.chainId === chainId && !$isRequested}
-              <button
-                on:click={handleRequest}
-                class="button is-medium connect "
-              >
-                Request Tokens
-              </button>
-            {/if}
+          {:else if $isAuthenticated && $connected && window.ethereum.chainId === chainId && !$isRequested}
+            <button on:click={handleRequest} class="button is-medium connect ">
+              Request Tokens
+            </button>
+          {:else}
             <div id="timer" />
-          </div>
+          {/if}
         </div>
       </div>
     </div>
@@ -522,7 +500,7 @@
     );
     backdrop-filter: blur(3px);
     -webkit-backdrop-filter: blur(10px);
-    border-radius: 10px;
+    border-radius: 4px;
     border: 1px solid rgba(255, 255, 255, 0.18);
     box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
   }
@@ -537,20 +515,79 @@
     background-color: #28ff98;
     color: #010504;
   }
-
-  .avatar {
-    border-radius: 50%;
-  }
   .accountButton {
-    color: #010504;
+    font-family: 'Arial';
+    font-weight: 600;
+    left: 20px;
+  }
+  .loading:before {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    background: #ffffffd6;
+  }
+  .loading:after {
+    content: '';
+    position: absolute;
+    left: calc(50% - 44px);
+    top: calc(50% - 48px);
+    width: 88px;
+    height: 88px;
+    border: 10px solid #fff;
+    border-bottom-color: blue;
+    border-radius: 50%;
+    box-sizing: border-box;
+    animation: rotation 1s linear infinite;
+  }
+  @keyframes rotation {
+    0% {
+      transform: rotate(0deg);
+    }
+    100% {
+      transform: rotate(360deg);
+    }
+  }
+  .dropdown-content {
+    background-color: #3e56c4;
+    padding: 0.5rem;
+    border-radius: 4px;
+  }
+  a.dropdown-item {
+    background-color: #3e56c4;
+    color: #ffffff;
+    display: block;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    padding: 0.375rem 1rem;
+    position: relative;
     font-family: 'Arial';
     font-style: normal;
     font-weight: 600;
-    font-size: 16px;
-    line-height: 140%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 40px;
+  }
+  a.dropdown-item {
+    padding-right: 1rem;
+    text-align: inherit;
+    white-space: nowrap;
+    width: auto;
+    border-radius: 4px;
+  }
+
+  a.dropdown-item:hover {
+    background-color: #6f88f7;
+    /* color: #ffffff; */
+    color: #363636;
+  }
+
+  .dropdown-button {
+    background-color: #485fc7;
+    color: #fff;
+    border-color: #485fc7;
+  }
+  .dropdown-button:hover {
+    background-color: #6f88f7;
+    border-color: #6f88f7;
   }
 </style>

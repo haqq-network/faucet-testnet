@@ -1,5 +1,8 @@
 {
   "scripts": {
     "build": "cd web && npm ci --production=false && npx rollup -c"
+  },
+  "dependencies": {
+    "dotenv": "^16.0.1"
   }
 }
