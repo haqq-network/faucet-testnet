@@ -9,6 +9,7 @@ export const githubUser = writable({});
 export const popupOpen = writable(false);
 export const error = writable();
 export const tasks = writable([]);
+export const loading = writable(false);
 
 export const user_tasks = derived([tasks, user], ([$tasks, $user]) => {
   let logged_in_user_tasks = [];

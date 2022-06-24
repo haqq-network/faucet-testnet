@@ -15,7 +15,7 @@
       target="blank"
       rel="noopener noreferrer"
       ><i
-        class="fa fa-facebook animate__animated animate__slideInDown animate__slow"
+        class="fa fa-facebook animate__animated animate__slideInDown animate__slow footer-icon"
         style="font-size:30px"
       /></a
     >
@@ -25,13 +25,13 @@
       target="_blank"
       rel="noopener noreferrer"
       ><i
-        class="fa fa-linkedin animate__animated animate__slideInDown animate__slow"
+        class="fa fa-linkedin animate__animated animate__slideInDown animate__slow footer-icon"
         style="font-size:30px"
       /></a
     >
     <a href="https://twitter.com/islamiccoin_net"
       ><i
-        class="fa fa-twitter animate__animated animate__slideInDown animate__slow"
+        class="fa fa-twitter animate__animated animate__slideInDown animate__slow footer-icon"
         style="font-size:30px"
       /></a
     >
@@ -42,7 +42,7 @@
       target="_blank"
       rel="noopener noreferrer"
       ><i
-        class="fa fa-youtube animate__animated animate__slideInDown animate__slow"
+        class="fa fa-youtube animate__animated animate__slideInDown animate__slow footer-icon"
         style="font-size:30px"
       /></a
     >
@@ -53,7 +53,18 @@
       target="_blank"
       rel="noopener noreferrer"
       ><i
-        class="fa fa-telegram animate__animated animate__slideInDown animate__slow"
+        class="fa fa-medium animate__animated animate__slideInDown animate__slow footer-icon"
+        style="font-size:30px"
+      /></a
+    >
+
+    <a
+      href="https://t.me/islamic_coin"
+      class="animate__animated"
+      target="_blank"
+      rel="noopener noreferrer"
+      ><i
+        class="fa fa-telegram animate__animated animate__slideInDown animate__slow footer-icon"
         style="font-size:30px"
       /></a
     >
@@ -77,5 +88,9 @@
     line-height: 140%;
     text-align: center;
     letter-spacing: 0.02em;
+  }
+
+  .footer-icon {
+    margin: 5px;
   }
 </style>
