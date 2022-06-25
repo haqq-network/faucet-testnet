@@ -22,7 +22,7 @@ func init() {
 	viper.SetDefault("queuecap", 100)
 	viper.SetDefault("amount", 1)
 	viper.SetDefault("interval", 1440)
-	viper.SetDefault("chainID", 53211)
+	viper.SetDefault("chain", 53211)
 }
 
 // serveCmd represents the serve command
@@ -37,7 +37,7 @@ var serveCmd = &cobra.Command{
 			panic(fmt.Errorf("failed to read private key: %w", err))
 		}
 
-		txBuilder, err := chain.NewTxBuilder(os.Getenv("WEB3_PROVIDER"), privateKey, big.NewInt(viper.GetInt64("chainID")))
+		txBuilder, err := chain.NewTxBuilder(os.Getenv("WEB3_PROVIDER"), privateKey, big.NewInt(viper.GetInt64("chain")))
 		if err != nil {
 			panic(fmt.Errorf("cannot connect to web3 provider: %w", err))
 		}
