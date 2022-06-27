@@ -8,14 +8,15 @@
     defaultEvmStores,
     selectedAccount,
     web3,
+    chainData,
   } from 'svelte-web3';
+  import { Balance } from 'svelte-web3/components';
   import auth from './authService';
   import {
     isAuthenticated,
     lastRequestedTime,
     githubUser,
     isRequested,
-    loading,
   } from './store';
   import Icon from '@iconify/svelte';
   import Footer from './components/Footer.svelte';
@@ -29,12 +30,14 @@
   let github = null;
   let countdown = null;
   let chainId = '0xcfdb'; // TODO: load from config
+  // let chainId = '0x5'; // TODO: load from config //goerli network 
   let unsubscribeRequestedTime = {};
   let faucetInfo = {
     account: '0x0000000000000000000000000000000000000000',
     network: 'testnet',
     payout: 1,
   };
+  let loading = false;
 
   $: document.title = `ISLM ${capitalize(faucetInfo.network)} Faucet`;
 
@@ -50,7 +53,7 @@
 
   // onMount hook
   onMount(async () => {
-    console.log(await $web3?.eth?.getBalance($selectedAccount), 'afterUpdate');
+    loading = true;
     unsubscribeRequestedTime = lastRequestedTime.subscribe(handleRequestTime);
     if (localStorage.getItem('metaMaskConnected')) {
       await defaultEvmStores.setProvider();
@@ -62,12 +65,12 @@
       isAuthenticated.set(await auth0Client.isAuthenticated());
     }
     if ($githubUser?.nickname) {
+      loading = true;
       try {
-        loading.set(true);
         const response = await fetch(
           `/api/requested?github=${$githubUser?.nickname}`
         );
-        loading.set(false);
+        loading = false;
         if (!response.ok) {
           const text = await response.text();
           throw new Error(text);
@@ -83,12 +86,14 @@
         // faucetInfo = await res.json();
       } catch (error) {
         bulmaToast.toast({
-          message: error.message,
+          message: error?.message,
           type: 'is-danger',
         });
+        loading = false;
         // console.log(error);
       }
     }
+    loading = false;
   });
 
   // onDestroy hook
@@ -99,19 +104,15 @@
 
   // afterUpdate hook
   afterUpdate(async () => {
-    console.log(await $web3?.eth?.getBalance($selectedAccount), 'afterUpdate');
-    $web3.eth.getBalance($selectedAccount);
     unsubscribeRequestedTime = lastRequestedTime.subscribe(handleRequestTime);
     if (localStorage.getItem('metamaskWallet') !== (await userWallet())) {
       localStorage.setItem('metamaskWallet', await userWallet());
     }
     if ($githubUser?.nickname) {
-      // loading.set(true);
       try {
         const response = await fetch(
           `/api/requested?github=${$githubUser?.nickname}`
         );
-        // loading.set(false);
         if (!response.ok) {
           const text = await response.text();
           throw new Error(text);
@@ -125,11 +126,11 @@
             : isRequested.set(true);
         }
       } catch (error) {
-        bulmaToast.toast({
-          message: error.message,
-          type: 'is-danger',
-        });
-        console.log(error.message);
+        // bulmaToast.toast({
+        //   message: error,
+        //   type: 'is-danger',
+        // });
+        console.log(error);
       }
     }
   });
@@ -247,17 +248,20 @@
 
   // login github
   async function login() {
+    loading = true;
     try {
       auth0Client = await auth.createClient();
       await auth.loginWithPopup(auth0Client);
       githubUser.set(await auth0Client.getUser());
       localStorage.setItem('githubConnected', true);
       isAuthenticated.set(await auth0Client.isAuthenticated());
+      loading = false;
     } catch (error) {
       bulmaToast.toast({
         message: error.message,
         type: 'is-danger',
       });
+      loading = false;
     }
   }
 
@@ -313,6 +317,20 @@
                   rpcUrls: ['https://rpc.eth.testedge.haqq.network/'],
                 },
               ],
+              // params: [ //goerli network 
+              //   {
+              //     chainId: chainId,
+              //     chainName: 'Haqq Network goerli',
+              //     nativeCurrency: {
+              //       name: 'IslamicCoin',
+              //       symbol: 'ISLM',
+              //       decimals: 18,
+              //     },
+              //     rpcUrls: [
+              //       'https://goerli.infura.io/v3/4caf0abc1c81486fa2985a9cab3c9497',
+              //     ],
+              //   },
+              // ],
             });
           } catch (addError) {
             bulmaToast.toast({
@@ -456,23 +474,30 @@
               </button>
             </div>
           {/if}
-          {#if $connected && !$isAuthenticated && loading}
-            <div class="loading" />
-          {:else if $connected && !$isAuthenticated && !loading}
-            <button on:click={login} class="button connect is-medium m-1 ">
-              <span class="icon">
-                <i class="fa fa-github" />
-              </span>
-              <span> Login </span>
-            </button>
-          {:else if $isAuthenticated && $connected && window.ethereum.chainId === chainId && !$isRequested}
-            <button on:click={handleRequest} class="button is-medium connect ">
-              Request Tokens
-            </button>
-          {:else}
-            <div id="timer" />
-          {/if}
+          <div class:loading>
+            {#if $connected && !$isAuthenticated && !loading}
+              <button on:click={login} class="button connect is-medium m-1 ">
+                <span class="icon">
+                  <i class="fa fa-github" />
+                </span>
+                <span> Login </span>
+              </button>
+            {:else if $isAuthenticated && $connected && window.ethereum.chainId === chainId && !$isRequested}
+              <button
+                on:click={handleRequest}
+                class="button is-medium connect "
+              >
+                Request Tokens
+              </button>
+            {:else}
+              <div id="timer" />
+            {/if}
+          </div>
         </div>
+        <!-- <p>
+          Selected account balance = <Balance address={$selectedAccount} />
+          {$chainData.nativeCurrency?.symbol}
+        </p> -->
       </div>
     </div>
     <Footer />
