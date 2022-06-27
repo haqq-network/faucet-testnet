@@ -8,7 +8,9 @@
     defaultEvmStores,
     selectedAccount,
     web3,
+    chainData,
   } from 'svelte-web3';
+  import { Balance } from 'svelte-web3/components';
   import auth from './authService';
   import {
     isAuthenticated,
@@ -29,7 +31,7 @@
   let countdown = null;
   let balanceTimer = null;
   let chainId = '0xcfdb'; // TODO: load from config
-  // let chainId = '0x5'; //goerli network
+  // let chainId = '0x5'; // TODO: load from config //goerli network
   let unsubscribeRequestedTime = {};
   let faucetInfo = {
     account: '0x0000000000000000000000000000000000000000',
@@ -63,26 +65,35 @@
       githubUser.set(await auth0Client.getUser());
       isAuthenticated.set(await auth0Client.isAuthenticated());
     }
-    $web3.eth?.getAccounts().then(() => {
+    if ($githubUser?.nickname) {
+      loading = true;
       try {
-        return $web3.eth?.subscribe('newBlockHeaders', (err) => {
-          if (err) {
-            bulmaToast.toast({
-              message: err.message,
-              type: 'is-danger',
-            });
-          } else {
-            balance = $web3.eth.getBalance(checkAccount);
-          }
-        });
+        const response = await fetch(
+          `/api/requested?github=${$githubUser?.nickname}`,
+        );
+        loading = false;
+        if (!response.ok) {
+          const text = await response.text();
+          throw new Error(text);
+        }
+        const claimInfo = await response?.json();
+        let currentTime = Math.floor(new Date().getTime() / 1000);
+        let nextClaimTime = claimInfo.last_requested_time + 60 * 60 * 24;
+        lastRequestedTime.set(claimInfo.last_requested_time);
+        currentTime >= nextClaimTime
+          ? isRequested.set(false)
+          : isRequested.set(true);
+        // const res = await fetch('/api/info');
+        // faucetInfo = await res.json();
       } catch (error) {
         bulmaToast.toast({
-          message: error.message,
+          message: error?.message,
           type: 'is-danger',
         });
-        console.log(error);
+        loading = false;
+        // console.log(error);
       }
-    });
+    }
     loading = false;
   });
 
@@ -95,13 +106,14 @@
 
   // afterUpdate hook
   afterUpdate(async () => {
+    unsubscribeRequestedTime = lastRequestedTime.subscribe(handleRequestTime);
     if (localStorage.getItem('metamaskWallet') !== (await userWallet())) {
       localStorage.setItem('metamaskWallet', await userWallet());
     }
     if ($githubUser?.nickname) {
       try {
         const response = await fetch(
-          `/api/requested?github=${$githubUser?.nickname}`
+          `/api/requested?github=${$githubUser?.nickname}`,
         );
         if (!response.ok) {
           console.log(response.statusText);
@@ -307,8 +319,7 @@
                   rpcUrls: ['https://rpc.eth.testedge.haqq.network/'],
                 },
               ],
-              //goerli network
-              // params: [
+              // params: [ //goerli network
               //   {
               //     chainId: chainId,
               //     chainName: 'Haqq Network goerli',
@@ -339,7 +350,7 @@
     } else {
       // if no window.ethereum then MetaMask is not installed
       alert(
-        'MetaMask is not installed. Please consider installing it: https://metamask.io/download.html'
+        'MetaMask is not installed. Please consider installing it: https://metamask.io/download.html',
       );
     }
   }
@@ -486,6 +497,10 @@
             {/if}
           </div>
         </div>
+        <!-- <p>
+          Selected account balance = <Balance address={$selectedAccount} />
+          {$chainData.nativeCurrency?.symbol}
+        </p> -->
       </div>
     </div>
     <Footer />
