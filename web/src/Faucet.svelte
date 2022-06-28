@@ -80,7 +80,6 @@
       isAuthenticated.set(await auth0Client.isAuthenticated());
     }
     if ($githubUser?.nickname) {
-      loading = true;
       try {
         const response = await fetch(
           `/api/requested?github=${$githubUser?.nickname}`,
