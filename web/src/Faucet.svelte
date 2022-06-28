@@ -29,8 +29,9 @@
   let address = null;
   let github = null;
   let countdown = null;
+  let balanceTimer = null;
   let chainId = '0xcfdb'; // TODO: load from config
-  // let chainId = '0x5'; // TODO: load from config //goerli network 
+  // let chainId = '0x5'; //goerli network
   let unsubscribeRequestedTime = {};
   let faucetInfo = {
     account: '0x0000000000000000000000000000000000000000',
@@ -54,6 +55,20 @@
   // onMount hook
   onMount(async () => {
     loading = true;
+    balanceTimer = setInterval(async () => {
+      try {
+        if (balance) {
+          balance = await $web3.eth.getBalance(checkAccount);
+        }
+        console.log(balance);
+      } catch (error) {
+        bulmaToast.toast({
+          message: error?.message,
+          type: 'is-danger',
+        });
+        console.log(error);
+      }
+    }, 5000);
     unsubscribeRequestedTime = lastRequestedTime.subscribe(handleRequestTime);
     if (localStorage.getItem('metaMaskConnected')) {
       await defaultEvmStores.setProvider();
@@ -99,6 +114,7 @@
   // onDestroy hook
   onDestroy(() => {
     countdown ?? clearInterval(countdown);
+    balanceTimer ?? clearInterval(balanceTimer);
     unsubscribeRequestedTime();
   });
 
@@ -317,7 +333,8 @@
                   rpcUrls: ['https://rpc.eth.testedge.haqq.network/'],
                 },
               ],
-              // params: [ //goerli network 
+              //goerli network
+              // params: [
               //   {
               //     chainId: chainId,
               //     chainName: 'Haqq Network goerli',
@@ -377,7 +394,8 @@
               {#await balance}
                 <span> waiting... </span>
               {:then value}
-                <span>{$web3.utils.fromWei(value).substring(0, 5)} ISLM</span> &nbsp
+                <span>{$web3.utils.fromWei(value).substring(0, 5)} ISLM</span>
+                &nbsp
               {/await}
             </a>
           {/if}
