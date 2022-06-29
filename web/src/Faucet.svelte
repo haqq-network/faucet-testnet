@@ -31,7 +31,7 @@
   let countdown = null;
   let balanceTimer = null;
   let chainId = '0xcfdb'; // TODO: load from config
-  // let chainId = '0x5'; //goerli network
+  // let chainId = '0x5'; // TODO: load from config //goerli network
   let unsubscribeRequestedTime = {};
   let faucetInfo = {
     account: '0x0000000000000000000000000000000000000000',
@@ -55,20 +55,6 @@
   // onMount hook
   onMount(async () => {
     loading = true;
-    balanceTimer = setInterval(async () => {
-      try {
-        if (balance) {
-          balance = await $web3.eth.getBalance(checkAccount);
-        }
-        console.log(balance);
-      } catch (error) {
-        bulmaToast.toast({
-          message: error?.message,
-          type: 'is-danger',
-        });
-        console.log(error);
-      }
-    }, 5000);
     unsubscribeRequestedTime = lastRequestedTime.subscribe(handleRequestTime);
     if (localStorage.getItem('metaMaskConnected')) {
       await defaultEvmStores.setProvider();
@@ -79,47 +65,39 @@
       githubUser.set(await auth0Client.getUser());
       isAuthenticated.set(await auth0Client.isAuthenticated());
     }
-    if ($githubUser?.nickname) {
-      try {
-        const response = await fetch(
-          `/api/requested?github=${$githubUser?.nickname}`,
-        );
-        loading = false;
-        if (!response.ok) {
-          const text = await response.text();
-          throw new Error(text);
-        }
-        const claimInfo = await response?.json();
-        let currentTime = Math.floor(new Date().getTime() / 1000);
-        let nextClaimTime = claimInfo.last_requested_time + 60 * 60 * 24;
-        lastRequestedTime.set(claimInfo.last_requested_time);
-        currentTime >= nextClaimTime
-          ? isRequested.set(false)
-          : isRequested.set(true);
-        // const res = await fetch('/api/info');
-        // faucetInfo = await res.json();
-      } catch (error) {
-        bulmaToast.toast({
-          message: error?.message,
-          type: 'is-danger',
-        });
-        loading = false;
-        // console.log(error);
-      }
-    }
     loading = false;
   });
 
   // onDestroy hook
   onDestroy(() => {
     countdown ?? clearInterval(countdown);
-    balanceTimer ?? clearInterval(balanceTimer);
     unsubscribeRequestedTime();
     $web3.eth.clearSubscriptions();
   });
 
   // afterUpdate hook
   afterUpdate(async () => {
+    $web3.eth?.getAccounts().then(() => {
+      try {
+        return $web3.eth.subscribe('newBlockHeaders', (err) => {
+          if (err) {
+            bulmaToast.toast({
+              message: err.message,
+              type: 'is-danger',
+            });
+          } else {
+            balance = $web3.eth.getBalance(checkAccount);
+            $web3.eth.clearSubscriptions(); // логика в том, чтобы отписаться сразу после получения результата (баланса)
+          }
+        });
+      } catch (error) {
+        bulmaToast.toast({
+          message: error.message,
+          type: 'is-danger',
+        });
+        console.log(error);
+      }
+    });
     unsubscribeRequestedTime = lastRequestedTime.subscribe(handleRequestTime);
     if (localStorage.getItem('metamaskWallet') !== (await userWallet())) {
       localStorage.setItem('metamaskWallet', await userWallet());
