@@ -31,7 +31,7 @@
   let countdown = null;
   let balanceTimer = null;
   let chainId = '0xcfdb'; // TODO: load from config
-  // let chainId = '0x5'; // TODO: load from config //goerli network
+  // let chainId = '0x5'; //goerli network
   let unsubscribeRequestedTime = {};
   let faucetInfo = {
     account: '0x0000000000000000000000000000000000000000',
@@ -65,20 +65,9 @@
       githubUser.set(await auth0Client.getUser());
       isAuthenticated.set(await auth0Client.isAuthenticated());
     }
-    loading = false;
-  });
-
-  // onDestroy hook
-  onDestroy(() => {
-    countdown ?? clearInterval(countdown);
-    unsubscribeRequestedTime();
-  });
-
-  // afterUpdate hook
-  afterUpdate(async () => {
     $web3.eth?.getAccounts().then(() => {
       try {
-        return $web3.eth.subscribe('newBlockHeaders', (err) => {
+        return $web3.eth?.subscribe('newBlockHeaders', (err) => {
           if (err) {
             bulmaToast.toast({
               message: err.message,
@@ -86,7 +75,6 @@
             });
           } else {
             balance = $web3.eth.getBalance(checkAccount);
-            $web3.eth.clearSubscriptions(); // логика в том, чтобы отписаться сразу после получения результата (баланса)
           }
         });
       } catch (error) {
@@ -97,6 +85,18 @@
         console.log(error);
       }
     });
+    loading = false;
+  });
+
+  // onDestroy hook
+  onDestroy(() => {
+    countdown ?? clearInterval(countdown);
+    unsubscribeRequestedTime();
+    $web3.eth.clearSubscriptions();
+  });
+
+  // afterUpdate hook
+  afterUpdate(async () => {
     unsubscribeRequestedTime = lastRequestedTime.subscribe(handleRequestTime);
     if (localStorage.getItem('metamaskWallet') !== (await userWallet())) {
       localStorage.setItem('metamaskWallet', await userWallet());
@@ -383,7 +383,7 @@
             <div class="dropdown is-hoverable is-right">
               <div class="dropdown-trigger">
                 <a
-                  class="button dropdown-button p-"
+                  class="button dropdown-button"
                   aria-haspopup="true"
                   aria-controls="dropdown-menu"
                 >
@@ -489,10 +489,6 @@
             {/if}
           </div>
         </div>
-        <!-- <p>
-          Selected account balance = <Balance address={$selectedAccount} />
-          {$chainData.nativeCurrency?.symbol}
-        </p> -->
       </div>
     </div>
     <Footer />
@@ -597,7 +593,6 @@
 
   a.dropdown-item:hover {
     background-color: #6f88f7;
-    /* color: #ffffff; */
     color: #363636;
   }
 
