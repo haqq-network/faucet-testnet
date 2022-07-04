@@ -23,6 +23,7 @@ func init() {
 	viper.SetDefault("amount", 1)
 	viper.SetDefault("interval", 1440)
 	viper.SetDefault("chain", 53211)
+	viper.SetDefault("slack_hook", "https://hooks.slack.com/services/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")
 }
 
 // serveCmd represents the serve command
