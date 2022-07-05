@@ -8,14 +8,15 @@
     defaultEvmStores,
     selectedAccount,
     web3,
+    chainData,
   } from 'svelte-web3';
+  import { Balance } from 'svelte-web3/components';
   import auth from './authService';
   import {
     isAuthenticated,
     lastRequestedTime,
     githubUser,
     isRequested,
-    loading,
   } from './store';
   import Icon from '@iconify/svelte';
   import Footer from './components/Footer.svelte';
@@ -28,13 +29,16 @@
   let address = null;
   let github = null;
   let countdown = null;
+  let balanceTimer = null;
   let chainId = '0xcfdb'; // TODO: load from config
+  // let chainId = '0x5'; //goerli network
   let unsubscribeRequestedTime = {};
   let faucetInfo = {
     account: '0x0000000000000000000000000000000000000000',
     network: 'testnet',
     payout: 1,
   };
+  let loading = false;
 
   $: document.title = `ISLM ${capitalize(faucetInfo.network)} Faucet`;
 
@@ -50,7 +54,7 @@
 
   // onMount hook
   onMount(async () => {
-    console.log(await $web3?.eth?.getBalance($selectedAccount), 'afterUpdate');
+    loading = true;
     unsubscribeRequestedTime = lastRequestedTime.subscribe(handleRequestTime);
     if (localStorage.getItem('metaMaskConnected')) {
       await defaultEvmStores.setProvider();
@@ -61,61 +65,51 @@
       githubUser.set(await auth0Client.getUser());
       isAuthenticated.set(await auth0Client.isAuthenticated());
     }
-    if ($githubUser?.nickname) {
+    $web3.eth?.getAccounts().then(() => {
       try {
-        loading.set(true);
-        const response = await fetch(
-          `/api/requested?github=${$githubUser?.nickname}`
-        );
-        loading.set(false);
-        if (!response.ok) {
-          const text = await response.text();
-          throw new Error(text);
-        }
-        const claimInfo = await response?.json();
-        let currentTime = Math.floor(new Date().getTime() / 1000);
-        let nextClaimTime = claimInfo.last_requested_time + 60 * 60 * 24;
-        lastRequestedTime.set(claimInfo.last_requested_time);
-        currentTime >= nextClaimTime
-          ? isRequested.set(false)
-          : isRequested.set(true);
-        // const res = await fetch('/api/info');
-        // faucetInfo = await res.json();
+        return $web3.eth?.subscribe('newBlockHeaders', (err) => {
+          if (err) {
+            bulmaToast.toast({
+              message: err.message,
+              type: 'is-danger',
+            });
+          } else {
+            balance = $web3.eth.getBalance(checkAccount);
+          }
+        });
       } catch (error) {
         bulmaToast.toast({
           message: error.message,
           type: 'is-danger',
         });
-        // console.log(error);
+        console.log(error);
       }
-    }
+    });
+    loading = false;
   });
 
   // onDestroy hook
   onDestroy(() => {
     countdown ?? clearInterval(countdown);
     unsubscribeRequestedTime();
+    $web3.eth.clearSubscriptions();
   });
 
   // afterUpdate hook
   afterUpdate(async () => {
-    console.log(await $web3?.eth?.getBalance($selectedAccount), 'afterUpdate');
-    $web3.eth.getBalance($selectedAccount);
     unsubscribeRequestedTime = lastRequestedTime.subscribe(handleRequestTime);
     if (localStorage.getItem('metamaskWallet') !== (await userWallet())) {
       localStorage.setItem('metamaskWallet', await userWallet());
     }
     if ($githubUser?.nickname) {
-      // loading.set(true);
       try {
         const response = await fetch(
           `/api/requested?github=${$githubUser?.nickname}`
         );
-        // loading.set(false);
         if (!response.ok) {
-          const text = await response.text();
-          throw new Error(text);
-        } else {
+          console.log(response.statusText);
+          throw new Error(response.statusText);
+        } else if (response.ok && isRequested) {
           const claimInfo = await response.json();
           let currentTime = Math.floor(new Date().getTime() / 1000);
           let nextClaimTime = claimInfo.last_requested_time + 60 * 60 * 24;
@@ -125,11 +119,11 @@
             : isRequested.set(true);
         }
       } catch (error) {
-        bulmaToast.toast({
-          message: error.message,
-          type: 'is-danger',
-        });
-        console.log(error.message);
+        // bulmaToast.toast({
+        //   message: error,
+        //   type: 'is-danger',
+        // });
+        console.log(error);
       }
     }
   });
@@ -247,17 +241,20 @@
 
   // login github
   async function login() {
+    loading = true;
     try {
       auth0Client = await auth.createClient();
       await auth.loginWithPopup(auth0Client);
       githubUser.set(await auth0Client.getUser());
       localStorage.setItem('githubConnected', true);
       isAuthenticated.set(await auth0Client.isAuthenticated());
+      loading = false;
     } catch (error) {
       bulmaToast.toast({
         message: error.message,
         type: 'is-danger',
       });
+      loading = false;
     }
   }
 
@@ -313,6 +310,21 @@
                   rpcUrls: ['https://rpc.eth.testedge.haqq.network/'],
                 },
               ],
+              //goerli network
+              // params: [
+              //   {
+              //     chainId: chainId,
+              //     chainName: 'Haqq Network goerli',
+              //     nativeCurrency: {
+              //       name: 'IslamicCoin',
+              //       symbol: 'ISLM',
+              //       decimals: 18,
+              //     },
+              //     rpcUrls: [
+              //       'https://goerli.infura.io/v3/4caf0abc1c81486fa2985a9cab3c9497',
+              //     ],
+              //   },
+              // ],
             });
           } catch (addError) {
             bulmaToast.toast({
@@ -359,7 +371,8 @@
               {#await balance}
                 <span> waiting... </span>
               {:then value}
-                <span>{$web3.utils.fromWei(value).substring(0, 5)} ISLM</span> &nbsp
+                <span>{$web3.utils.fromWei(value).substring(0, 5)} ISLM</span>
+                &nbsp
               {/await}
             </a>
           {/if}
@@ -370,7 +383,7 @@
             <div class="dropdown is-hoverable is-right">
               <div class="dropdown-trigger">
                 <a
-                  class="button dropdown-button p-"
+                  class="button dropdown-button"
                   aria-haspopup="true"
                   aria-controls="dropdown-menu"
                 >
@@ -456,22 +469,25 @@
               </button>
             </div>
           {/if}
-          {#if $connected && !$isAuthenticated && loading}
-            <div class="loading" />
-          {:else if $connected && !$isAuthenticated && !loading}
-            <button on:click={login} class="button connect is-medium m-1 ">
-              <span class="icon">
-                <i class="fa fa-github" />
-              </span>
-              <span> Login </span>
-            </button>
-          {:else if $isAuthenticated && $connected && window.ethereum.chainId === chainId && !$isRequested}
-            <button on:click={handleRequest} class="button is-medium connect ">
-              Request Tokens
-            </button>
-          {:else}
-            <div id="timer" />
-          {/if}
+          <div class:loading>
+            {#if $connected && !$isAuthenticated && !loading}
+              <button on:click={login} class="button connect is-medium m-1 ">
+                <span class="icon">
+                  <i class="fa fa-github" />
+                </span>
+                <span> Login </span>
+              </button>
+            {:else if $isAuthenticated && $connected && window.ethereum.chainId === chainId && !$isRequested}
+              <button
+                on:click={handleRequest}
+                class="button is-medium connect "
+              >
+                Request Tokens
+              </button>
+            {:else}
+              <div id="timer" />
+            {/if}
+          </div>
         </div>
       </div>
     </div>
@@ -577,7 +593,6 @@
 
   a.dropdown-item:hover {
     background-color: #6f88f7;
-    /* color: #ffffff; */
     color: #363636;
   }
 
