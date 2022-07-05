@@ -8,9 +8,7 @@
     defaultEvmStores,
     selectedAccount,
     web3,
-    chainData,
   } from 'svelte-web3';
-  import { Balance } from 'svelte-web3/components';
   import auth from './authService';
   import {
     isAuthenticated,
@@ -97,7 +95,6 @@
 
   // afterUpdate hook
   afterUpdate(async () => {
-    unsubscribeRequestedTime = lastRequestedTime.subscribe(handleRequestTime);
     if (localStorage.getItem('metamaskWallet') !== (await userWallet())) {
       localStorage.setItem('metamaskWallet', await userWallet());
     }
@@ -143,7 +140,7 @@
       } else {
         clearInterval(countdown);
         isRequested.set(false);
-        document.getElementById('timer').innerText = '';
+        // document.getElementById('timer').innerText = '';
       }
     }, 1000);
   };
@@ -484,7 +481,7 @@
               >
                 Request Tokens
               </button>
-            {:else}
+            {:else if $isAuthenticated && $connected && window.ethereum.chainId === chainId && $isRequested}
               <div id="timer" />
             {/if}
           </div>
