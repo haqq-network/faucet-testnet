@@ -1,8 +1,10 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -128,16 +130,25 @@ func (s *Server) handleClaim() http.HandlerFunc {
 
 		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 		defer cancel()
-		_, err := s.requestStore.Insert(github)
-		if err != nil {
-			log.WithError(err).Error("Failed to save request")
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
 		txHash, err := s.Transfer(ctx, address, chain.EtherToWei(viper.GetInt64("amount")))
 		s.mutex.Unlock()
 		if err != nil {
+			go func() {
+				if err.Error() == "insufficient funds for gas * price + value" {
+					err := SendSlackNotification("TestEdge Faucet: No funds left for distribution.")
+					if err != nil {
+						log.WithError(err).Error("Failed to send notification to slack")
+					}
+				}
+			}()
 			log.WithError(err).Error("Failed to send transaction")
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		_, err = s.requestStore.Insert(github)
+		if err != nil {
+			log.WithError(err).Error("Failed to save request")
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -202,4 +213,33 @@ func (s *Server) handleLastRequest() http.HandlerFunc {
 			LastRequestedTime: req.RequestDate,
 		})
 	}
+}
+
+// SendSlackNotification will post to an 'Incoming Webook' url setup in Slack Apps. It accepts
+// some text and the slack channel is saved within Slack.
+func SendSlackNotification(msg string) error {
+	type SlackRequestBody struct {
+		Text string `json:"text"`
+	}
+
+	slackBody, _ := json.Marshal(SlackRequestBody{Text: msg})
+	req, err := http.NewRequest(http.MethodPost, viper.GetString("slack_hook"), bytes.NewBuffer(slackBody))
+	if err != nil {
+		return err
+	}
+
+	req.Header.Add("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+
+	buf := new(bytes.Buffer)
+	buf.ReadFrom(resp.Body)
+	if buf.String() != "ok" {
+		return errors.New("non-ok response returned from Slack")
+	}
+	return nil
 }
