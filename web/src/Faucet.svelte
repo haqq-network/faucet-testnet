@@ -14,7 +14,8 @@
     isAuthenticated,
     lastRequestedTime,
     githubUser,
-    isRequested,
+    isTokenRequested,
+    isChecked,
   } from './store';
   import Icon from '@iconify/svelte';
   import Footer from './components/Footer.svelte';
@@ -53,50 +54,19 @@
   // onMount hook
   onMount(async () => {
     loading = true;
+    isChecked.set(false);
     unsubscribeRequestedTime = lastRequestedTime.subscribe(handleRequestTime);
     if (localStorage.getItem('metaMaskConnected')) {
       await defaultEvmStores.setProvider();
       auth0Client = await auth.createClient();
     }
+    if (localStorage.getItem('metamaskWallet') !== (await userWallet())) {
+      localStorage.setItem('metamaskWallet', await userWallet());
+    }
     if (localStorage.getItem('githubConnected')) {
       auth0Client = await auth.createClient();
       githubUser.set(await auth0Client.getUser());
       isAuthenticated.set(await auth0Client.isAuthenticated());
-    }
-    $web3.eth?.getAccounts().then(() => {
-      try {
-        return $web3.eth?.subscribe('newBlockHeaders', (err) => {
-          if (err) {
-            bulmaToast.toast({
-              message: err.message,
-              type: 'is-danger',
-            });
-          } else {
-            balance = $web3.eth.getBalance(checkAccount);
-          }
-        });
-      } catch (error) {
-        bulmaToast.toast({
-          message: error.message,
-          type: 'is-danger',
-        });
-        console.log(error);
-      }
-    });
-    loading = false;
-  });
-
-  // onDestroy hook
-  onDestroy(() => {
-    countdown ?? clearInterval(countdown);
-    unsubscribeRequestedTime();
-    $web3.eth.clearSubscriptions();
-  });
-
-  // afterUpdate hook
-  afterUpdate(async () => {
-    if (localStorage.getItem('metamaskWallet') !== (await userWallet())) {
-      localStorage.setItem('metamaskWallet', await userWallet());
     }
     if ($githubUser?.nickname) {
       try {
@@ -104,16 +74,16 @@
           `/api/requested?github=${$githubUser?.nickname}`,
         );
         if (!response.ok) {
-          console.log(response.statusText);
           throw new Error(response.statusText);
-        } else if (response.ok && isRequested) {
+        } else if (response.ok) {
           const claimInfo = await response.json();
           let currentTime = Math.floor(new Date().getTime() / 1000);
           let nextClaimTime = claimInfo.last_requested_time + 60 * 60 * 24;
           lastRequestedTime.set(claimInfo.last_requested_time);
           currentTime >= nextClaimTime
-            ? isRequested.set(false)
-            : isRequested.set(true);
+            ? isTokenRequested.set(false)
+            : isTokenRequested.set(true);
+          isChecked.set(true);
         }
       } catch (error) {
         // bulmaToast.toast({
@@ -123,6 +93,29 @@
         console.log(error);
       }
     }
+    try {
+      await $web3.eth?.getAccounts();
+      $web3.eth?.subscribe('newBlockHeaders', (err) => {
+        if (err) {
+          throw err;
+        }
+        balance = $web3.eth.getBalance(checkAccount);
+      });
+    } catch (error) {
+      bulmaToast.toast({
+        message: error.message,
+        type: 'is-danger',
+      });
+      console.log(error);
+    }
+    loading = false;
+  });
+
+  // onDestroy hook
+  onDestroy(() => {
+    countdown ?? clearInterval(countdown);
+    unsubscribeRequestedTime();
+    $web3.eth.clearSubscriptions();
   });
 
   // countdown timer
@@ -136,10 +129,10 @@
       const timer = nextClaimTime - currentTime;
       if (timer > 0) {
         document.getElementById('timer').innerText = `${toHHMMSS(timer)}`;
-        isRequested.set(true);
+        isTokenRequested.set(true);
       } else {
         clearInterval(countdown);
-        isRequested.set(false);
+        isTokenRequested.set(false);
         // document.getElementById('timer').innerText = '';
       }
     }, 1000);
@@ -194,7 +187,7 @@
         });
         throw new Error(text);
       } else {
-        isRequested.set(true);
+        isTokenRequested.set(true);
         bulmaToast.toast({
           message: 'User received 1 ISLM',
           type: 'is-success',
@@ -261,7 +254,7 @@
     localStorage.removeItem('githubUser');
     localStorage.removeItem('githubConnected');
     githubUser.set({});
-    isRequested.set(false);
+    isTokenRequested.set(false);
     lastRequestedTime(null);
   }
 
@@ -467,21 +460,21 @@
             </div>
           {/if}
           <div class:loading>
-            {#if $connected && !$isAuthenticated && !loading}
+            {#if connected && !isAuthenticated && !loading}
               <button on:click={login} class="button connect is-medium m-1 ">
                 <span class="icon">
                   <i class="fa fa-github" />
                 </span>
                 <span> Login </span>
               </button>
-            {:else if $isAuthenticated && $connected && window.ethereum.chainId === chainId && !$isRequested}
+            {:else if isAuthenticated && connected && window.ethereum.chainId === chainId && !isTokenRequested}
               <button
                 on:click={handleRequest}
                 class="button is-medium connect "
               >
                 Request Tokens
               </button>
-            {:else if $isAuthenticated && $connected && window.ethereum.chainId === chainId && $isRequested}
+            {:else if isAuthenticated && connected && window.ethereum.chainId === chainId && isTokenRequested && isChecked}
               <div id="timer" />
             {/if}
           </div>
@@ -550,7 +543,7 @@
     width: 88px;
     height: 88px;
     border: 10px solid #fff;
-    border-bottom-color: blue;
+    border-bottom-color: rgb(28, 207, 113);
     border-radius: 50%;
     box-sizing: border-box;
     animation: rotation 1s linear infinite;
