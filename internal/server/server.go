@@ -135,7 +135,7 @@ func (s *Server) handleClaim() http.HandlerFunc {
 		if err != nil {
 			go func() {
 				if err.Error() == "insufficient funds for gas * price + value" {
-					err := SendSlackNotification("TestEdge Faucet: No funds left for distribution.")
+					err := SendSlackNotification(fmt.Sprintf("TestEdge Faucet: No funds left for distribution. Popup to address %s", s.TxBuilder.Sender().String()))
 					if err != nil {
 						log.WithError(err).Error("Failed to send notification to slack")
 					}
