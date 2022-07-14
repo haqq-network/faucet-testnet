@@ -8,9 +8,7 @@
     defaultEvmStores,
     selectedAccount,
     web3,
-    chainData,
   } from 'svelte-web3';
-  import { Balance } from 'svelte-web3/components';
   import auth from './authService';
   import {
     isAuthenticated,
@@ -97,7 +95,6 @@
 
   // afterUpdate hook
   afterUpdate(async () => {
-    unsubscribeRequestedTime = lastRequestedTime.subscribe(handleRequestTime);
     if (localStorage.getItem('metamaskWallet') !== (await userWallet())) {
       localStorage.setItem('metamaskWallet', await userWallet());
     }
