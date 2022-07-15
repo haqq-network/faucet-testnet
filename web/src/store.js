@@ -1,9 +1,9 @@
 import { writable, derived } from 'svelte/store';
 
 export const isAuthenticated = writable(false);
-export const isChecked = writable(false);
 export const isGithubAuth = writable(false);
 export const isTokenRequested = writable(false);
+export const isChecked = writable(false);
 export const lastRequestedTime = writable(null);
 export const user = writable({});
 export const githubUser = writable({});

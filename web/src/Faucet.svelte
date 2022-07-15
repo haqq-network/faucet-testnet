@@ -1,5 +1,5 @@
 <script>
-  import { onMount, afterUpdate, onDestroy } from 'svelte';
+  import { onMount, onDestroy, afterUpdate, beforeUpdate } from 'svelte';
   import { getAddress } from '@ethersproject/address';
   import * as bulmaToast from 'bulma-toast';
   import 'animate.css';
@@ -28,10 +28,10 @@
   let address = null;
   let github = null;
   let countdown = null;
-  let balanceTimer = null;
-  let chainId = '0xcfdb'; // TODO: load from config
-  // let chainId = '0x5'; //goerli network
+  // let chainId = '0xcfdb'; // TODO: load from config
+  let chainId = '0x5'; //goerli network
   let unsubscribeRequestedTime = {};
+  let unsubscribeGithubUser = {};
   let faucetInfo = {
     account: '0x0000000000000000000000000000000000000000',
     network: 'testnet',
@@ -51,31 +51,22 @@
     animate: { in: 'fadeIn', out: 'fadeOut' },
   });
 
-  // onMount hook
-  onMount(async () => {
-    loading = true;
-    isChecked.set(false);
-    unsubscribeRequestedTime = lastRequestedTime.subscribe(handleRequestTime);
-    if (localStorage.getItem('metaMaskConnected')) {
-      await defaultEvmStores.setProvider();
-      auth0Client = await auth.createClient();
-    }
-    if (localStorage.getItem('metamaskWallet') !== (await userWallet())) {
-      localStorage.setItem('metamaskWallet', await userWallet());
-    }
-    if (localStorage.getItem('githubConnected')) {
-      auth0Client = await auth.createClient();
-      githubUser.set(await auth0Client.getUser());
-      isAuthenticated.set(await auth0Client.isAuthenticated());
-    }
-    if ($githubUser?.nickname) {
+  async function pukech(value) {
+    if (value?.nickname) {
       try {
+        isChecked.set(false);
         const response = await fetch(
-          `/api/requested?github=${$githubUser?.nickname}`,
+          `/api/requested?github=${value?.nickname}`,
         );
+        isChecked.set(true);
         if (!response.ok) {
-          throw new Error(response.statusText);
-        } else if (response.ok) {
+          const text = await response.text();
+          bulmaToast.toast({
+            message: text,
+            type: 'is-danger',
+          });
+          throw new Error(text);
+        } else {
           const claimInfo = await response.json();
           let currentTime = Math.floor(new Date().getTime() / 1000);
           let nextClaimTime = claimInfo.last_requested_time + 60 * 60 * 24;
@@ -83,30 +74,30 @@
           currentTime >= nextClaimTime
             ? isTokenRequested.set(false)
             : isTokenRequested.set(true);
-          isChecked.set(true);
         }
       } catch (error) {
-        // bulmaToast.toast({
-        //   message: error,
-        //   type: 'is-danger',
-        // });
-        console.log(error);
+        bulmaToast.toast({
+          message: error.text,
+          type: 'is-danger',
+        });
       }
     }
-    try {
-      await $web3.eth?.getAccounts();
-      $web3.eth?.subscribe('newBlockHeaders', (err) => {
-        if (err) {
-          throw err;
-        }
-        balance = $web3.eth.getBalance(checkAccount);
-      });
-    } catch (error) {
-      bulmaToast.toast({
-        message: error.message,
-        type: 'is-danger',
-      });
-      console.log(error);
+  }
+
+  // onMount hook
+  onMount(async () => {
+    loading = true;
+    if (!window?.ethereum) loading = false;
+    unsubscribeRequestedTime = lastRequestedTime.subscribe(handleRequestTime);
+    unsubscribeGithubUser = githubUser.subscribe(pukech);
+    if (localStorage.getItem('metaMaskConnected')) {
+      await defaultEvmStores.setProvider();
+      auth0Client = await auth.createClient();
+    }
+    if (localStorage.getItem('githubConnected')) {
+      auth0Client = await auth.createClient();
+      githubUser.set(await auth0Client.getUser());
+      isAuthenticated.set(await auth0Client.isAuthenticated());
     }
     loading = false;
   });
@@ -115,43 +106,70 @@
   onDestroy(() => {
     countdown ?? clearInterval(countdown);
     unsubscribeRequestedTime();
+    unsubscribeGithubUser();
     $web3.eth.clearSubscriptions();
   });
 
+  afterUpdate(async () => {
+    if (
+      localStorage.getItem('metamaskWallet') !==
+      (await $web3.eth?.getAccounts())
+    ) {
+      localStorage.setItem('metamaskWallet', await $web3.eth?.getAccounts());
+    }
+    await $web3.eth?.getAccounts();
+    try {
+      $web3.eth?.subscribe('newBlockHeaders', (error) => {
+        if (error) {
+          throw error;
+        } else {
+          balance = $web3.eth.getBalance(checkAccount);
+        }
+      });
+    } catch (error) {
+      bulmaToast.toast({
+        message: error.message,
+        type: 'is-danger',
+      });
+      console.log(error);
+    }
+    $web3.eth?.clearSubscriptions();
+  });
+
   // countdown timer
-  const handleRequestTime = () => {
-    if (!$lastRequestedTime) {
+  const handleRequestTime = (value) => {
+    if (!value) {
+      clearInterval(countdown);
       return;
     }
-    const nextClaimTime = $lastRequestedTime + 60 * 60 * 24;
+    const nextClaimTime = value + 60 * 60 * 24;
     countdown = setInterval(() => {
       let currentTime = Math.floor(new Date().getTime() / 1000);
       const timer = nextClaimTime - currentTime;
       if (timer > 0) {
-        document.getElementById('timer').innerText = `${toHHMMSS(timer)}`;
         isTokenRequested.set(true);
+        document.getElementById('timer').innerText = `${toHHMMSS(timer)}`;
       } else {
-        clearInterval(countdown);
         isTokenRequested.set(false);
+        clearInterval(countdown);
         // document.getElementById('timer').innerText = '';
       }
     }, 1000);
   };
 
   // connect metamask wallet
-  const enableBrowser = async () => {
+  const connectMetamask = async () => {
     await defaultEvmStores.setProvider();
-    localStorage.setItem('metamaskWallet', await userWallet());
+    localStorage.setItem('metamaskWallet', await $web3.eth?.getAccounts());
     localStorage.setItem('metaMaskConnected', $connected);
     defaultEvmStores.setProvider();
     bulmaToast.toast({
-      message: `${await userWallet()} connected successfully`,
+      message: `${await $web3.eth?.getAccounts()} connected successfully`,
       type: 'is-success',
     });
   };
-
   // disconnect Metamask wallet ONLY ON FRONT
-  const disableBrowser = async () => {
+  const disconnectMetamask = async () => {
     await defaultEvmStores.disconnect();
     localStorage.removeItem('metamaskWallet');
     localStorage.removeItem('metaMaskConnected');
@@ -161,24 +179,24 @@
     });
   };
 
-  // getting Metamask wallet address
-  const userWallet = async () => {
-    const wallet = await window.ethereum?.selectedAddress;
-    return wallet;
-  };
-
   // request tokens
-  async function handleRequest() {
+  async function handleRequestTokens() {
     try {
+      loading = true;
       address = getAddress(checkAccount);
       github = $githubUser?.nickname;
       let formData = new FormData();
       formData.append('address', address);
       formData.append('github', github);
+      isChecked.set(false);
       const response = await fetch('/api/claim', {
         method: 'POST',
         body: formData,
       });
+      const responseTime = await fetch(
+        `/api/requested?github=${$githubUser?.nickname}`,
+      );
+      isChecked.set(true);
       if (!response.ok) {
         const text = await response.text();
         bulmaToast.toast({
@@ -187,18 +205,25 @@
         });
         throw new Error(text);
       } else {
-        isTokenRequested.set(true);
+        const claimInfo = await responseTime.json();
+        let currentTime = Math.floor(new Date().getTime() / 1000);
+        let nextClaimTime = claimInfo.last_requested_time + 60 * 60 * 24;
+        lastRequestedTime.set(claimInfo.last_requested_time);
+        currentTime >= nextClaimTime
+          ? isTokenRequested.set(false)
+          : isTokenRequested.set(true);
         bulmaToast.toast({
-          message: 'User received 1 ISLM',
+          message: 'You received 1 ISLM',
           type: 'is-success',
         });
       }
+      loading = false;
     } catch (error) {
-      console.log(error);
       bulmaToast.toast({
         message: error.message,
         type: 'is-danger',
       });
+      loading = false;
       return;
     }
     // let message = await res.text();
@@ -230,7 +255,7 @@
   }
 
   // login github
-  async function login() {
+  async function githubLogin() {
     loading = true;
     try {
       auth0Client = await auth.createClient();
@@ -244,24 +269,27 @@
         message: error.message,
         type: 'is-danger',
       });
+    } finally {
       loading = false;
     }
   }
 
   // logout github
-  function logout() {
+  function githubLogout() {
+    loading = true;
     auth.logout(auth0Client);
     localStorage.removeItem('githubUser');
     localStorage.removeItem('githubConnected');
     githubUser.set({});
     isTokenRequested.set(false);
     lastRequestedTime(null);
+    loading = false;
   }
 
   // hide metamask middle symbols
   const hideAddress = async () => {
-    let result = await userWallet();
-    return `${result?.slice(0, 4)}...${result?.slice(38, 42)}`;
+    let result = await $web3.eth?.getAccounts();
+    return `${result[0]?.slice(0, 4)}.....${result[0]?.slice(38, 42)}`;
   };
 
   // detect and switch chain
@@ -300,7 +328,7 @@
                   rpcUrls: ['https://rpc.eth.testedge.haqq.network/'],
                 },
               ],
-              //goerli network
+              // goerli network
               // params: [
               //   {
               //     chainId: chainId,
@@ -361,7 +389,7 @@
               {#await balance}
                 <span> waiting... </span>
               {:then value}
-                <span>{$web3.utils.fromWei(value).substring(0, 5)} ISLM</span>
+                <span>{$web3.utils.fromWei(value).slice(0, 5)} ISLM</span>
                 &nbsp
               {/await}
             </a>
@@ -385,7 +413,7 @@
               <div class="dropdown-menu" id="dropdown-menu" role="menu">
                 <div class="dropdown-content p-1">
                   {#if $isAuthenticated}
-                    <a on:click={logout} class="dropdown-item m-1">
+                    <a on:click={githubLogout} class="dropdown-item m-1">
                       <Icon
                         icon="akar-icons:github-fill"
                         inline={true}
@@ -395,7 +423,7 @@
                     </a>
                   {/if}
                   {#if window.ethereum && $connected}
-                    <a on:click={disableBrowser} class="dropdown-item m-1">
+                    <a on:click={disconnectMetamask} class="dropdown-item m-1">
                       <Icon
                         icon="logos:metamask-icon"
                         inline={true}
@@ -424,14 +452,16 @@
                 <span class="icon">
                   <Icon icon="logos:metamask-icon" inline={true} />
                 </span>
-                <a href="https://metamask.io/download/"> Download Metamask </a>
+                <a href="https://metamask.io/download/" target="blank">
+                  Download Metamask
+                </a>
               </button>
             </div>
           {/if}
-          {#if window.ethereum && !$connected}
+          {#if window.ethereum && !$connected && !loading}
             <div class="control">
               <button
-                on:click={enableBrowser}
+                on:click={connectMetamask}
                 class="button connect is-medium "
               >
                 <span class="icon">
@@ -449,7 +479,7 @@
                 <img src="haqq.svg" width="300" alt="haqqNetworkLogo" />
               </figure>
             </div>
-          {:else if window.ethereum?.chainId !== chainId && $connected}
+          {:else if window.ethereum?.chainId !== chainId && $connected && !loading}
             <div class="column">
               <button
                 class="button is-medium connect m-1"
@@ -460,21 +490,24 @@
             </div>
           {/if}
           <div class:loading>
-            {#if connected && !isAuthenticated && !loading}
-              <button on:click={login} class="button connect is-medium m-1 ">
+            {#if window.ethereum?.chainId === chainId && $connected && !$isAuthenticated && !loading}
+              <button
+                on:click={githubLogin}
+                class="button connect is-medium m-1"
+              >
                 <span class="icon">
                   <i class="fa fa-github" />
                 </span>
                 <span> Login </span>
               </button>
-            {:else if isAuthenticated && connected && window.ethereum.chainId === chainId && !isTokenRequested}
+            {:else if window?.ethereum?.chainId === chainId && $connected && $isAuthenticated && !$isTokenRequested && $isChecked && !loading}
               <button
-                on:click={handleRequest}
-                class="button is-medium connect "
+                on:click={handleRequestTokens}
+                class="button is-medium connect"
               >
                 Request Tokens
               </button>
-            {:else if isAuthenticated && connected && window.ethereum.chainId === chainId && isTokenRequested && isChecked}
+            {:else if window?.ethereum?.chainId === chainId && $connected && $isAuthenticated && $isTokenRequested && $isChecked && !loading}
               <div id="timer" />
             {/if}
           </div>
