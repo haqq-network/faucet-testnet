@@ -42,7 +42,7 @@ func (s *RequestStore) Insert(github string) (*models.Request, error) {
 		return &p, err
 	}
 
-	if time.Now().Unix() >= (p.RequestDate + 60) {
+	if time.Now().Unix() >= (p.RequestDate + 86400) {
 		p.RequestDate = time.Now().Unix()
 		err := s.Update(&p)
 		return &p, err
