@@ -19,7 +19,6 @@
   } from './store';
   import Icon from '@iconify/svelte';
   import Footer from './components/Footer.svelte';
-
   $: checkAccount =
     $selectedAccount || '0x0000000000000000000000000000000000000000';
   $: balance = $connected ? $web3.eth.getBalance(checkAccount) : '';
@@ -28,8 +27,8 @@
   let address = null;
   let github = null;
   let countdown = null;
-  // let chainId = '0xcfdb'; // TODO: load from config
-  let chainId = '0x5'; //goerli network
+  let chainId = '0xcfdb'; // TODO: load from config
+  // let chainId = '0x5'; //goerli network
   let unsubscribeRequestedTime = {};
   let unsubscribeGithubUser = {};
   let faucetInfo = {
@@ -51,7 +50,7 @@
     animate: { in: 'fadeIn', out: 'fadeOut' },
   });
 
-  async function pukech(value) {
+  async function githubUserRequest(value) {
     if (value?.nickname) {
       try {
         isChecked.set(false);
@@ -87,17 +86,20 @@
   // onMount hook
   onMount(async () => {
     loading = true;
+    web3.subscribe(web3BalanceSubscribe);
     if (!window?.ethereum) loading = false;
-    unsubscribeRequestedTime = lastRequestedTime.subscribe(handleRequestTime);
-    unsubscribeGithubUser = githubUser.subscribe(pukech);
-    if (localStorage.getItem('metaMaskConnected')) {
-      await defaultEvmStores.setProvider();
-      auth0Client = await auth.createClient();
-    }
-    if (localStorage.getItem('githubConnected')) {
-      auth0Client = await auth.createClient();
-      githubUser.set(await auth0Client.getUser());
-      isAuthenticated.set(await auth0Client.isAuthenticated());
+    if (window?.ethereum) {
+      unsubscribeRequestedTime = lastRequestedTime.subscribe(handleRequestTime);
+      unsubscribeGithubUser = githubUser.subscribe(githubUserRequest);
+      if (localStorage.getItem('metaMaskConnected')) {
+        await defaultEvmStores.setProvider();
+        auth0Client = await auth.createClient();
+      }
+      if (localStorage.getItem('githubConnected')) {
+        auth0Client = await auth.createClient();
+        githubUser.set(await auth0Client.getUser());
+        isAuthenticated.set(await auth0Client.isAuthenticated());
+      }
     }
     loading = false;
   });
@@ -107,7 +109,6 @@
     countdown ?? clearInterval(countdown);
     unsubscribeRequestedTime();
     unsubscribeGithubUser();
-    $web3.eth.clearSubscriptions();
   });
 
   afterUpdate(async () => {
@@ -117,23 +118,6 @@
     ) {
       localStorage.setItem('metamaskWallet', await $web3.eth?.getAccounts());
     }
-    await $web3.eth?.getAccounts();
-    try {
-      $web3.eth?.subscribe('newBlockHeaders', (error) => {
-        if (error) {
-          throw error;
-        } else {
-          balance = $web3.eth.getBalance(checkAccount);
-        }
-      });
-    } catch (error) {
-      bulmaToast.toast({
-        message: error.message,
-        type: 'is-danger',
-      });
-      console.log(error);
-    }
-    $web3.eth?.clearSubscriptions();
   });
 
   // countdown timer
@@ -247,6 +231,29 @@
       seconds = '0' + seconds;
     }
     return hours + ':' + minutes + ':' + seconds;
+  };
+
+  const web3BalanceSubscribe = () => {
+    web3.subscribe((value) => {
+      if (value.eth) {
+        try {
+          value.eth.subscribe('newBlockHeaders', (error) => {
+            if (error) {
+              throw error;
+            } else {
+              balance = value.eth.getBalance(checkAccount);
+            }
+          });
+        } catch (error) {
+          bulmaToast.toast({
+            message: error.message,
+            type: 'is-danger',
+          });
+          console.log(error);
+        }
+        value.eth.clearSubscriptions();
+      }
+    });
   };
 
   function capitalize(str) {
