@@ -1,6 +1,6 @@
 import createAuth0Client from '@auth0/auth0-spa-js';
 import { isAuthenticated, popupOpen, isGithubAuth, githubUser } from './store';
-import config from '../auth_config';
+import config from '../gh-auth.config';
 import * as bulmaToast from 'bulma-toast';
 
 async function createClient() {

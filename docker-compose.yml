@@ -17,8 +17,6 @@ services:
       PRIVATE_KEY:
       WEB3_PROVIDER: http://34.159.174.117:8545
 
-
-
   postgres:
     image: postgres:13
     restart: unless-stopped

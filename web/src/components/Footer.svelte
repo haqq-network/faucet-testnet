@@ -1,8 +1,4 @@
-<script>
-  import 'animate.css';
-</script>
-
-<footer class="footer ">
+<footer class="footer">
   <div class="content has-text-centered">
     <p class="footer-info animate__animated animate__slideInDown animate__slow">
       <a href="https://islamiccoin.net/" target="blank">
@@ -14,27 +10,29 @@
       class="animate__animated"
       target="blank"
       rel="noopener noreferrer"
-      ><i
+    >
+      <i
         class="fa fa-facebook animate__animated animate__slideInDown animate__slow footer-icon"
         style="font-size:30px"
-      /></a
-    >
+      />
+    </a>
     <a
       href="https://www.linkedin.com/company/islamiccoin/"
       class="animate__animated"
       target="_blank"
       rel="noopener noreferrer"
-      ><i
+    >
+      <i
         class="fa fa-linkedin animate__animated animate__slideInDown animate__slow footer-icon"
         style="font-size:30px"
-      /></a
-    >
-    <a href="https://twitter.com/islamiccoin_net"
-      ><i
+      />
+    </a>
+    <a href="https://twitter.com/islamiccoin_net">
+      <i
         class="fa fa-twitter animate__animated animate__slideInDown animate__slow footer-icon"
         style="font-size:30px"
-      /></a
-    >
+      />
+    </a>
 
     <a
       href="https://www.youtube.com/channel/UCTjvOCTDeO9H67y_6btF1NA"
@@ -52,22 +50,24 @@
       class="animate__animated"
       target="_blank"
       rel="noopener noreferrer"
-      ><i
+    >
+      <i
         class="fa fa-medium animate__animated animate__slideInDown animate__slow footer-icon"
         style="font-size:30px"
-      /></a
-    >
+      />
+    </a>
 
     <a
       href="https://t.me/islamic_coin"
       class="animate__animated"
       target="_blank"
       rel="noopener noreferrer"
-      ><i
+    >
+      <i
         class="fa fa-telegram animate__animated animate__slideInDown animate__slow footer-icon"
         style="font-size:30px"
-      /></a
-    >
+      />
+    </a>
   </div>
 </footer>
 
@@ -75,9 +75,6 @@
   .footer {
     background: linear-gradient(rgba(255, 255, 255, 0), rgba(0, 0, 0, 0)),
       url('/backgroundd2.jpg') no-repeat center center fixed;
-    -webkit-background-size: cover;
-    -moz-background-size: cover;
-    -o-background-size: cover;
     background-size: cover;
   }
   .footer-info {
