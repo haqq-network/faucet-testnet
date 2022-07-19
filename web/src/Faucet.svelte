@@ -1,8 +1,7 @@
-<script>
+<script lang="ts">
   import { onMount, onDestroy, afterUpdate } from 'svelte';
   import { getAddress } from '@ethersproject/address';
   import * as bulmaToast from 'bulma-toast';
-  import 'animate.css';
   import {
     connected,
     defaultEvmStores,
@@ -19,6 +18,7 @@
   } from './store';
   import Icon from '@iconify/svelte';
   import Footer from './components/Footer.svelte';
+
   $: checkAccount =
     $selectedAccount || '0x0000000000000000000000000000000000000000';
   $: balance = $connected ? $web3.eth.getBalance(checkAccount) : '';
@@ -376,7 +376,7 @@
 
 <main>
   <!-- svelte-ignore a11y-missing-attribute -->
-  <section class="hero is-info is-fullheight ">
+  <section class="hero is-info is-fullheight">
     <div class="hero-head">
       <nav class="navbar">
         <div class="navbar-brand">

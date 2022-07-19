@@ -1,6 +1,4 @@
-<script>
-  import 'animate.css';
-  import 'bulma/css/bulma.css';
+<script lang="ts">
   import Faucet from './Faucet.svelte';
 </script>
 
