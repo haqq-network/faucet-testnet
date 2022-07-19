@@ -2,4 +2,4 @@
 /coverage
 /.yarn
 /.helm
-
+/build
