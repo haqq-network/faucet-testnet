@@ -36,7 +36,7 @@ async function loginWithPopup(client, options) {
     });
     localStorage.setItem(
       'githubUser',
-      await client.getUser().then((data) => data.nickname)
+      await client.getUser().then((data) => data.nickname),
     );
     isGithubAuth.set(true);
   } catch (error) {
