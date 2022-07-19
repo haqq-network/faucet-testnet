@@ -1,5 +1,5 @@
 <script>
-  import { onMount, onDestroy, afterUpdate, beforeUpdate } from 'svelte';
+  import { onMount, onDestroy, afterUpdate } from 'svelte';
   import { getAddress } from '@ethersproject/address';
   import * as bulmaToast from 'bulma-toast';
   import 'animate.css';
@@ -109,6 +109,7 @@
     countdown ?? clearInterval(countdown);
     unsubscribeRequestedTime();
     unsubscribeGithubUser();
+    $web3.eth.clearSubscriptions();
   });
 
   afterUpdate(async () => {
