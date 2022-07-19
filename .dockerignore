@@ -1,2 +1,6 @@
-web/node_modules
 web/public/build
+**/node_modules/
+**/.git
+**/README.md
+**/.env
+**/.editorconfig
