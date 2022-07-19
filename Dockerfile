@@ -1,12 +1,14 @@
-FROM node:lts-alpine as frontend
+FROM node:16.15.1-alpine as frontend
 
 WORKDIR /frontend-build
 
-COPY ./web/package*.json ./
-RUN npm install
+COPY ./web/package.json ./
+COPY ./web/yarn.lock ./
+COPY ./web/.yarn ./.yarn
+RUN yarn install
 
 COPY ./web .
-RUN npm run build
+RUN yarn build
 
 FROM golang AS builder
 
