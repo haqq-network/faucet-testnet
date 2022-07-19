@@ -54,4 +54,4 @@ jobs:
           date
           cd repo
           date
-          werf converge --auto-rollback=true --log-debug
+          werf converge  # --auto-rollback=true --log-debug

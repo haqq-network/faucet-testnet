@@ -29,20 +29,21 @@ spec:
       serviceAccountName: {{ .Values.google_sa_name }}
       containers:
         - name: faucet
-          image: {{ index .Values.werf.image "faucet" }}
+          image: {{ index .Values.werf.image "haqq-faucet" }}
           env:
-            - name: DATABASE_URL
+            - name: DB_URL
               value: gcp:secretmanager:projects/{{ .Values.google_project_id }}/secrets/FAUCET_DATABASE_URI
             - name: PRIVATE_KEY
               value: gcp:secretmanager:projects/{{ .Values.google_project_id }}/secrets/FAUCET_PRIVATE_KEY
             - name: PORT
-              value: 8080
+              value: "8080"
             - name: WEB3_PROVIDER
               value: {{ .Values.ethereum_jsonrpc_http_url }}
           command:
             - "/secrets-init/bin/secrets-init"
           args:
             - "--provider"
+            - "google"
             - "/entrypoint.sh"
           resources:
             requests:

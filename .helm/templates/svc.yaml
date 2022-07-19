@@ -13,15 +13,15 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: testedge-ingress
+  name: faucet-ingress
   annotations:
-    kubernetes.io/ingress.global-static-ip-name: testedge-address
-    networking.gke.io/managed-certificates: testedge-cert
+    kubernetes.io/ingress.global-static-ip-name: faucet-address
+    networking.gke.io/managed-certificates: faucet-cert
     kubernetes.io/ingress.class: "gce"
 spec:
   defaultBackend:
     service:
-      name: testedge-svc
+      name: faucet-svc
       port:
         number: 8080
 
@@ -30,21 +30,21 @@ spec:
 apiVersion: cloud.google.com/v1
 kind: BackendConfig
 metadata:
-  name: testedge-backendconfig
+  name: faucet-backendconfig
 spec:
   securityPolicy:
-    name: "policy"
+    name: "faucet-policy"
 
 ---
 
 apiVersion: v1
 kind: Service
 metadata:
-  name: testedge-svc
+  name: faucet-svc
   labels:
     app: faucet
   annotations:
-    cloud.google.com/backend-config: '{"default": "testedge-backendconfig"}'
+    cloud.google.com/backend-config: '{"default": "faucet-backendconfig"}'
 spec:
   type: "NodePort"
   selector:
