@@ -9,12 +9,16 @@
     web3,
   } from 'svelte-web3';
   import auth from './authService';
+  import utils, { countdown } from './ulils';
+
   import {
     isAuthenticated,
     lastRequestedTime,
     githubUser,
     isTokenRequested,
     isChecked,
+    loadingSpinner,
+    timer,
   } from './store';
   import Icon from '@iconify/svelte';
   import Footer from './components/Footer.svelte';
@@ -23,10 +27,9 @@
     $selectedAccount || '0x0000000000000000000000000000000000000000';
   $: balance = $connected ? $web3.eth.getBalance(checkAccount) : '';
 
-  let auth0Client;
-  let address = null;
-  let github = null;
-  let countdown = null;
+  let auth0Client: any; //TODO: fix any
+  let address: string = '';
+  let github: string = '';
   let chainId = '0xcfdb'; // TODO: load from config
   // let chainId = '0x5'; //goerli network
   let unsubscribeRequestedTime = {};
@@ -36,7 +39,6 @@
     network: 'testnet',
     payout: 1,
   };
-  let loading = false;
 
   $: document.title = `ISLM ${capitalize(faucetInfo.network)} Faucet`;
 
@@ -50,47 +52,18 @@
     animate: { in: 'fadeIn', out: 'fadeOut' },
   });
 
-  async function githubUserRequest(value) {
-    if (value?.nickname) {
-      try {
-        isChecked.set(false);
-        const response = await fetch(
-          `/api/requested?github=${value?.nickname}`,
-        );
-        isChecked.set(true);
-        if (!response.ok) {
-          const text = await response.text();
-          bulmaToast.toast({
-            message: text,
-            type: 'is-danger',
-          });
-          throw new Error(text);
-        } else {
-          const claimInfo = await response.json();
-          let currentTime = Math.floor(new Date().getTime() / 1000);
-          let nextClaimTime = claimInfo.last_requested_time + 60 * 60 * 24;
-          lastRequestedTime.set(claimInfo.last_requested_time);
-          currentTime >= nextClaimTime
-            ? isTokenRequested.set(false)
-            : isTokenRequested.set(true);
-        }
-      } catch (error) {
-        bulmaToast.toast({
-          message: error.text,
-          type: 'is-danger',
-        });
-      }
-    }
-  }
-
   // onMount hook
   onMount(async () => {
-    loading = true;
+    loadingSpinner.set(true);
     web3.subscribe(web3BalanceSubscribe);
-    if (!window?.ethereum) loading = false;
+    if (!window?.ethereum) {
+      loadingSpinner.set(false);
+    }
     if (window?.ethereum) {
-      unsubscribeRequestedTime = lastRequestedTime.subscribe(handleRequestTime);
-      unsubscribeGithubUser = githubUser.subscribe(githubUserRequest);
+      unsubscribeRequestedTime = lastRequestedTime.subscribe(
+        utils.handleRequestTime,
+      );
+      unsubscribeGithubUser = githubUser.subscribe(utils.githubUserRequest);
       if (localStorage.getItem('metaMaskConnected')) {
         await defaultEvmStores.setProvider();
         auth0Client = await auth.createClient();
@@ -101,7 +74,7 @@
         isAuthenticated.set(await auth0Client.isAuthenticated());
       }
     }
-    loading = false;
+    loadingSpinner.set(false);
   });
 
   // onDestroy hook
@@ -121,37 +94,18 @@
     }
   });
 
-  // countdown timer
-  const handleRequestTime = (value) => {
-    if (!value) {
-      clearInterval(countdown);
-      return;
-    }
-    const nextClaimTime = value + 60 * 60 * 24;
-    countdown = setInterval(() => {
-      let currentTime = Math.floor(new Date().getTime() / 1000);
-      const timer = nextClaimTime - currentTime;
-      if (timer > 0) {
-        isTokenRequested.set(true);
-        document.getElementById('timer').innerText = `${toHHMMSS(timer)}`;
-      } else {
-        isTokenRequested.set(false);
-        clearInterval(countdown);
-        // document.getElementById('timer').innerText = '';
-      }
-    }, 1000);
-  };
-
   // connect metamask wallet
   const connectMetamask = async () => {
+    loadingSpinner.set(true);
     await defaultEvmStores.setProvider();
     localStorage.setItem('metamaskWallet', await $web3.eth?.getAccounts());
-    localStorage.setItem('metaMaskConnected', $connected);
+    localStorage.setItem('metaMaskConnected', 'true');
     defaultEvmStores.setProvider();
     bulmaToast.toast({
       message: `${await $web3.eth?.getAccounts()} connected successfully`,
       type: 'is-success',
     });
+    loadingSpinner.set(false);
   };
   // disconnect Metamask wallet ONLY ON FRONT
   const disconnectMetamask = async () => {
@@ -167,7 +121,7 @@
   // request tokens
   async function handleRequestTokens() {
     try {
-      loading = true;
+      loadingSpinner.set(true);
       address = getAddress(checkAccount);
       github = $githubUser?.nickname;
       let formData = new FormData();
@@ -181,7 +135,6 @@
       const responseTime = await fetch(
         `/api/requested?github=${$githubUser?.nickname}`,
       );
-      isChecked.set(true);
       if (!response.ok) {
         const text = await response.text();
         bulmaToast.toast({
@@ -192,7 +145,7 @@
       } else {
         const claimInfo = await responseTime.json();
         let currentTime = Math.floor(new Date().getTime() / 1000);
-        let nextClaimTime = claimInfo.last_requested_time + 60 * 60 * 24;
+        let nextClaimTime = claimInfo.last_requested_time + 30; //60 * 60 * 24;
         lastRequestedTime.set(claimInfo.last_requested_time);
         currentTime >= nextClaimTime
           ? isTokenRequested.set(false)
@@ -202,37 +155,20 @@
           type: 'is-success',
         });
       }
-      loading = false;
     } catch (error) {
       bulmaToast.toast({
         message: error.message,
         type: 'is-danger',
       });
-      loading = false;
       return;
+    } finally {
+      isChecked.set(true);
+      loadingSpinner.set(false);
     }
     // let message = await res.text();
     // let type = res.ok ? 'is-success' : 'is-warning';
     // toast({ message, type });
   }
-
-  // unix-timestamp to hh:mm:ss
-  const toHHMMSS = (number) => {
-    let sec_num = parseInt(number, 10);
-    let hours = Math.floor(sec_num / 3600);
-    let minutes = Math.floor((sec_num - hours * 3600) / 60);
-    let seconds = sec_num - hours * 3600 - minutes * 60;
-    if (hours < 10) {
-      hours = '0' + hours;
-    }
-    if (minutes < 10) {
-      minutes = '0' + minutes;
-    }
-    if (seconds < 10) {
-      seconds = '0' + seconds;
-    }
-    return hours + ':' + minutes + ':' + seconds;
-  };
 
   const web3BalanceSubscribe = () => {
     web3.subscribe((value) => {
@@ -257,41 +193,40 @@
     });
   };
 
-  function capitalize(str) {
+  function capitalize(str: string) {
     const lower = str.toLowerCase();
     return str.charAt(0).toUpperCase() + lower.slice(1);
   }
 
   // login github
   async function githubLogin() {
-    loading = true;
+    loadingSpinner.set(true);
     try {
       auth0Client = await auth.createClient();
       await auth.loginWithPopup(auth0Client);
       githubUser.set(await auth0Client.getUser());
-      localStorage.setItem('githubConnected', true);
+      localStorage.setItem('githubConnected', 'true');
       isAuthenticated.set(await auth0Client.isAuthenticated());
-      loading = false;
     } catch (error) {
       bulmaToast.toast({
         message: error.message,
         type: 'is-danger',
       });
     } finally {
-      loading = false;
+      loadingSpinner.set(false);
     }
   }
 
   // logout github
   function githubLogout() {
-    loading = true;
+    loadingSpinner.set(true);
     auth.logout(auth0Client);
     localStorage.removeItem('githubUser');
     localStorage.removeItem('githubConnected');
     githubUser.set({});
     isTokenRequested.set(false);
-    lastRequestedTime(null);
-    loading = false;
+    lastRequestedTime.set(null);
+    loadingSpinner.set(false);
   }
 
   // hide metamask middle symbols
@@ -302,6 +237,7 @@
 
   // detect and switch chain
   async function switchChain() {
+    loadingSpinner.set(true);
     // Check if MetaMask is installed
     // MetaMask injects the global API into window.ethereum
     if (window.ethereum) {
@@ -364,6 +300,8 @@
           message: error,
           type: 'is-danger',
         });
+      } finally {
+        loadingSpinner.set(false);
       }
     } else {
       // if no window.ethereum then MetaMask is not installed
@@ -466,7 +404,7 @@
               </button>
             </div>
           {/if}
-          {#if window.ethereum && !$connected && !loading}
+          {#if window.ethereum && !$connected}
             <div class="control">
               <button
                 on:click={connectMetamask}
@@ -487,7 +425,7 @@
                 <img src="haqq.svg" width="300" alt="haqqNetworkLogo" />
               </figure>
             </div>
-          {:else if window.ethereum?.chainId !== chainId && $connected && !loading}
+          {:else if window.ethereum?.chainId !== chainId && $connected}
             <div class="column">
               <button
                 class="button is-medium connect m-1"
@@ -497,8 +435,8 @@
               </button>
             </div>
           {/if}
-          <div class:loading>
-            {#if window.ethereum?.chainId === chainId && $connected && !$isAuthenticated && !loading}
+          <div class:loadingSpinner={$loadingSpinner}>
+            {#if window.ethereum?.chainId === chainId && $connected && !$isAuthenticated && !$loadingSpinner}
               <button
                 on:click={githubLogin}
                 class="button connect is-medium m-1"
@@ -508,15 +446,15 @@
                 </span>
                 <span> Login </span>
               </button>
-            {:else if window?.ethereum?.chainId === chainId && $connected && $isAuthenticated && !$isTokenRequested && $isChecked && !loading}
+            {:else if window?.ethereum?.chainId === chainId && $connected && $isAuthenticated && !$isTokenRequested && $isChecked && !$loadingSpinner}
               <button
                 on:click={handleRequestTokens}
                 class="button is-medium connect"
               >
                 Request Tokens
               </button>
-            {:else if window?.ethereum?.chainId === chainId && $connected && $isAuthenticated && $isTokenRequested && $isChecked && !loading}
-              <div id="timer" />
+            {:else if window?.ethereum?.chainId === chainId && $connected && $isAuthenticated && $isTokenRequested && $isChecked && !$loadingSpinner}
+              <div id="timer">{$timer}</div>
             {/if}
           </div>
         </div>
@@ -567,7 +505,7 @@
     font-weight: 600;
     left: 20px;
   }
-  .loading:before {
+  .loadingSpinner:before {
     content: '';
     position: absolute;
     top: 0;
@@ -576,7 +514,7 @@
     left: 0;
     background: #ffffffd6;
   }
-  .loading:after {
+  .loadingSpinner:after {
     content: '';
     position: absolute;
     left: calc(50% - 44px);
