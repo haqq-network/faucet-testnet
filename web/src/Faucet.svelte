@@ -145,7 +145,7 @@
       } else {
         const claimInfo = await responseTime.json();
         let currentTime = Math.floor(new Date().getTime() / 1000);
-        let nextClaimTime = claimInfo.last_requested_time + 30; //60 * 60 * 24;
+        let nextClaimTime = claimInfo.last_requested_time + 60 * 60 * 24;
         lastRequestedTime.set(claimInfo.last_requested_time);
         currentTime >= nextClaimTime
           ? isTokenRequested.set(false)
