@@ -329,8 +329,8 @@
                   chainId: chainId, //hexadecimal, 53211 decimal
                   chainName: 'Haqq Network Testnet',
                   nativeCurrency: {
-                    name: 'IslamicCoin',
-                    symbol: 'ISLMT', // 2-6 characters long
+                    name: 'Islamic Coin',
+                    symbol: 'ISLM', // 2-6 characters long
                     decimals: 18,
                   },
                   rpcUrls: ['https://rpc.eth.testedge.haqq.network/'],
@@ -342,7 +342,7 @@
               //     chainId: chainId,
               //     chainName: 'Haqq Network goerli',
               //     nativeCurrency: {
-              //       name: 'IslamicCoin',
+              //       name: 'Islamic Coin',
               //       symbol: 'ISLM',
               //       decimals: 18,
               //     },
