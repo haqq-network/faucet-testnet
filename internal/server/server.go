@@ -120,6 +120,14 @@ func (s *Server) handleClaim() http.HandlerFunc {
 			http.Error(w, "github account not valid", http.StatusInternalServerError)
 			return
 		}
+
+		_, err := s.requestStore.Insert(github, address)
+		if err != nil {
+			log.WithError(err).Error("Failed to save request")
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
 		// Try to lock mutex if the work queue is empty
 		if len(s.queue) != 0 || !s.mutex.TryLock() {
 			select {
@@ -150,13 +158,6 @@ func (s *Server) handleClaim() http.HandlerFunc {
 				}
 			}()
 			log.WithError(err).Error("Failed to send transaction")
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		_, err = s.requestStore.Insert(github, address)
-		if err != nil {
-			log.WithError(err).Error("Failed to save request")
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
