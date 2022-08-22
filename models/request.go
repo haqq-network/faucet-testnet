@@ -9,6 +9,7 @@ import (
 type Request struct {
 	ID          int    `json:"-"`
 	Github      string `json:"github"`
+	Address     string `json:"address"`
 	RequestDate int64  `json:"request_date,omitempty"`
 }
 
