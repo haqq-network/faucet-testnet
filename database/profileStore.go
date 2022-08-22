@@ -34,16 +34,17 @@ func (s *RequestStore) Get(github string) (*models.Request, error) {
 func (s *RequestStore) Insert(github, address string) (*models.Request, error) {
 	p := models.Request{Github: github}
 	count, _ := s.db.Model(&p).
-		Where("github = ?, address = ?", github, address).
+		Where("github = ?", github).
 		SelectAndCount()
 	if count == 0 {
-		p = models.Request{Github: github, Address: address, RequestDate: time.Now().Unix()}
+		p = models.Request{Github: github, RequestDate: time.Now().Unix()}
 		_, err := s.db.Model(&p).Insert()
 		return &p, err
 	}
 
 	if time.Now().Unix() >= (p.RequestDate + 86400) {
 		p.RequestDate = time.Now().Unix()
+		p.Address = address
 		err := s.Update(&p)
 		return &p, err
 	}
