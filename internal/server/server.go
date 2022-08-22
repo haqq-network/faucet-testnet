@@ -154,7 +154,7 @@ func (s *Server) handleClaim() http.HandlerFunc {
 			return
 		}
 
-		_, err = s.requestStore.Insert(github)
+		_, err = s.requestStore.Insert(github, address)
 		if err != nil {
 			log.WithError(err).Error("Failed to save request")
 			http.Error(w, err.Error(), http.StatusInternalServerError)

@@ -30,11 +30,11 @@ func (s *RequestStore) Get(github string) (*models.Request, error) {
 	return &p, err
 }
 
-// Insert a request with github id
-func (s *RequestStore) Insert(github string) (*models.Request, error) {
+// Insert a request with github and address.
+func (s *RequestStore) Insert(github, address string) (*models.Request, error) {
 	p := models.Request{Github: github}
 	count, _ := s.db.Model(&p).
-		Where("github = ?", github).
+		Where("github = ?, address = ?", github, address).
 		SelectAndCount()
 	if count == 0 {
 		p = models.Request{Github: github, RequestDate: time.Now().Unix()}
