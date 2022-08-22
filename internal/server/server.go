@@ -12,6 +12,7 @@ import (
 
 	"github.com/go-pg/pg"
 	"github.com/haqq-network/faucet-testnet/database"
+	"github.com/rs/cors"
 	"github.com/spf13/viper"
 
 	"github.com/LK4D4/trylock"
@@ -71,10 +72,17 @@ func (s *Server) Run() {
 		}
 	}()
 
+	c := cors.New(cors.Options{
+		AllowedOrigins:   []string{"https://testedge.haqq.network/"},
+		AllowCredentials: true,
+		// Enable Debugging for testing, consider disabling in production
+		Debug: true,
+	})
+
 	n := negroni.New(negroni.NewRecovery(), negroni.NewLogger())
 	n.UseHandler(s.setupRouter())
 	log.Infof("Starting http server %d", viper.GetInt("httpport"))
-	log.Fatal(http.ListenAndServe(":"+strconv.Itoa(viper.GetInt("httpport")), n))
+	log.Fatal(http.ListenAndServe(":"+strconv.Itoa(viper.GetInt("httpport")), c.Handler(n)))
 }
 
 func (s *Server) consumeQueue() {
