@@ -56,8 +56,10 @@ func (s *Server) setupRouter() *http.ServeMux {
 
 	router.Handle("/", http.FileServer(web.Dist()))
 
-	limiter := NewLimiter(viper.GetInt("proxycount"), time.Duration(viper.GetInt("interval"))*time.Minute)
-	router.Handle("/api/claim", negroni.New(limiter, negroni.Wrap(s.handleClaim())))
+	// TODO: disable IP limiter
+	//limiter := NewLimiter(viper.GetInt("proxycount"), time.Duration(viper.GetInt("interval"))*time.Minute)
+	//router.Handle("/api/claim", negroni.New(limiter, negroni.Wrap(s.handleClaim())))
+	router.Handle("/api/claim", s.handleClaim())
 	router.Handle("/api/info", s.handleInfo())
 	router.Handle("/api/requested", s.handleLastRequest())
 
