@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"regexp"
 	"strconv"
 	"time"
 
@@ -75,16 +76,14 @@ func (s *Server) Run() {
 	}()
 
 	c := cors.New(cors.Options{
-		AllowedOrigins:   []string{"https://testedge.haqq.network/"},
-		AllowCredentials: true,
-		// Enable Debugging for testing, consider disabling in production
-		Debug: true,
+		AllowedOrigins: []string{"https://testedge.haqq.network"},
 	})
 
 	n := negroni.New(negroni.NewRecovery(), negroni.NewLogger())
+	n.Use(c)
 	n.UseHandler(s.setupRouter())
 	log.Infof("Starting http server %d", viper.GetInt("httpport"))
-	log.Fatal(http.ListenAndServe(":"+strconv.Itoa(viper.GetInt("httpport")), c.Handler(n)))
+	log.Fatal(http.ListenAndServe(":"+strconv.Itoa(viper.GetInt("httpport")), n))
 }
 
 func (s *Server) consumeQueue() {
@@ -116,10 +115,16 @@ func (s *Server) handleClaim() http.HandlerFunc {
 		}
 
 		address := r.PostFormValue(AddressKey)
+		re := regexp.MustCompile("^0x[0-9a-fA-F]{40}$")
+		if !re.MatchString(address) {
+			http.Error(w, "Invalid address", http.StatusBadRequest)
+			return
+		}
+
 		github := r.PostFormValue(GithubKey)
 		// TODO: check if user has valid github account
 		if len(github) == 0 {
-			http.Error(w, "github account not valid", http.StatusInternalServerError)
+			http.Error(w, "github account not valid", http.StatusBadRequest)
 			return
 		}
 
