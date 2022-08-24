@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"regexp"
 	"strconv"
 	"time"
 
@@ -114,10 +115,16 @@ func (s *Server) handleClaim() http.HandlerFunc {
 		}
 
 		address := r.PostFormValue(AddressKey)
+		re := regexp.MustCompile("^0x[0-9a-fA-F]{40}$")
+		if !re.MatchString(address) {
+			http.Error(w, "Invalid address", http.StatusBadRequest)
+			return
+		}
+
 		github := r.PostFormValue(GithubKey)
 		// TODO: check if user has valid github account
 		if len(github) == 0 {
-			http.Error(w, "github account not valid", http.StatusInternalServerError)
+			http.Error(w, "github account not valid", http.StatusBadRequest)
 			return
 		}
 

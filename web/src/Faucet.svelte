@@ -198,7 +198,7 @@
           ? isTokenRequested.set(false)
           : isTokenRequested.set(true);
         bulmaToast.toast({
-          message: 'You received 1 ISLM',
+          message: 'You received 1000 ISLM',
           type: 'is-success',
         });
       }
