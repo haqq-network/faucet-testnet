@@ -114,6 +114,12 @@ func (s *Server) handleClaim() http.HandlerFunc {
 			return
 		}
 
+		log.WithFields(log.Fields{
+			"address": r.FormValue(AddressKey),
+			"github":  r.FormValue(GithubKey),
+			"ip":      r.RemoteAddr,
+		}).Info("Received request")
+
 		address := r.PostFormValue(AddressKey)
 		re := regexp.MustCompile("^0x[0-9a-fA-F]{40}$")
 		if !re.MatchString(address) {
