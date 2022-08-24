@@ -75,16 +75,14 @@ func (s *Server) Run() {
 	}()
 
 	c := cors.New(cors.Options{
-		AllowedOrigins:   []string{"https://testedge.haqq.network/"},
-		AllowCredentials: true,
-		// Enable Debugging for testing, consider disabling in production
-		Debug: true,
+		AllowedOrigins: []string{"https://testedge.haqq.network"},
 	})
 
 	n := negroni.New(negroni.NewRecovery(), negroni.NewLogger())
+	n.Use(c)
 	n.UseHandler(s.setupRouter())
 	log.Infof("Starting http server %d", viper.GetInt("httpport"))
-	log.Fatal(http.ListenAndServe(":"+strconv.Itoa(viper.GetInt("httpport")), c.Handler(n)))
+	log.Fatal(http.ListenAndServe(":"+strconv.Itoa(viper.GetInt("httpport")), n))
 }
 
 func (s *Server) consumeQueue() {
