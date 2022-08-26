@@ -17,7 +17,7 @@ func init() {
 	RootCmd.AddCommand(serveCmd)
 
 	// Here you will define your flags and configuration settings.
-	viper.SetDefault("httpport", 8080)
+	viper.SetDefault("httpport", "8080")
 	viper.SetDefault("proxycount", 0)
 	viper.SetDefault("queuecap", 100)
 	viper.SetDefault("amount", 1000)

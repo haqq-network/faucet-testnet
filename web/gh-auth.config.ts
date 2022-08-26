@@ -1,8 +1,8 @@
 // main config
 // TODO: use env variable for clientId
 const config = {
-  domain: 'dev-zzcvxgj4.us.auth0.com',
-  clientId: 'SDYhLKkZszAyUGCCket4mSBBxWSVdtQM',
+  domain: 'dev-kdij2qop.us.auth0.com',
+  clientId: 'GKJ6Mfrq5anKRwhKNcLKgV3Ma4g2fATw',
 };
 
 // auth0 config for dev needs
