@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
-	"strconv"
 	"time"
 
 	"github.com/gin-contrib/sessions"
@@ -87,8 +86,8 @@ func (s *Server) setupRouter(auth *authenticator.Authenticator) *gin.Engine {
 		api.GET("/login", HandlerLogin(auth))
 		api.GET("/callback", HandlerCallback(auth))
 		api.POST("/claim", middleware.IsAuthenticated, s.handleClaim())
-		api.GET("/info", s.handleInfo())
-		api.GET("/requested", s.handleLastRequest())
+		api.GET("/info", middleware.IsAuthenticated, s.handleInfo())
+		api.GET("/requested", middleware.IsAuthenticated, s.handleLastRequest())
 		api.GET("/logout", HandlerLogout)
 	}
 
@@ -229,19 +228,11 @@ func (s *Server) handleClaim() gin.HandlerFunc {
 	}
 }
 
-type info struct {
-	Account string `json:"account"`
-	Payout  string `json:"payout"`
-}
-
 func (s *Server) handleInfo() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-
-		ctx.Writer.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(ctx.Writer).Encode(info{
-			Account: s.Sender().String(),
-			Payout:  strconv.Itoa(viper.GetInt("amount")),
-		})
+		session := sessions.Default(ctx)
+		profile := session.Get("profile")
+		ctx.JSON(http.StatusOK, profile)
 	}
 }
 
