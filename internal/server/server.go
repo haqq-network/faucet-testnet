@@ -74,7 +74,7 @@ func (s *Server) setupRouter(auth *authenticator.Authenticator) *gin.Engine {
 		api.POST("/claim", middleware.IsAuthenticated, s.handleClaim())
 		api.GET("/info", middleware.IsAuthenticated, s.handleInfo())
 		api.GET("/requested", middleware.IsAuthenticated, s.handleLastRequest())
-		api.POST("/logout", HandlerLogout)
+		api.GET("/logout", HandlerLogout)
 	}
 
 	return router
