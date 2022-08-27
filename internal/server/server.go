@@ -59,21 +59,7 @@ func NewServer(builder chain.TxBuilder) *Server {
 }
 
 func (s *Server) setupRouter(auth *authenticator.Authenticator) *gin.Engine {
-	//router := http.NewServeMux()
-	//
-	//router.Handle("/", http.FileServer(web.Dist()))
-	//
-	//// TODO: disable IP limiter
-	////limiter := NewLimiter(viper.GetInt("proxycount"), time.Duration(viper.GetInt("interval"))*time.Minute)
-	////router.Handle("/api/claim", negroni.New(limiter, negroni.Wrap(s.handleClaim())))
-	//router.Handle("/api/claim", s.handleClaim())
-	//router.Handle("/api/info", s.handleInfo())
-	//router.Handle("/api/requested", s.handleLastRequest())
-
 	router := gin.Default()
-
-	// To store custom types in our cookies,
-	// we must first register them using gob.Register
 	gob.Register(map[string]interface{}{})
 
 	store := cookie.NewStore([]byte("secret"))
@@ -88,15 +74,8 @@ func (s *Server) setupRouter(auth *authenticator.Authenticator) *gin.Engine {
 		api.POST("/claim", middleware.IsAuthenticated, s.handleClaim())
 		api.GET("/info", middleware.IsAuthenticated, s.handleInfo())
 		api.GET("/requested", middleware.IsAuthenticated, s.handleLastRequest())
-		api.GET("/logout", HandlerLogout)
+		api.POST("/logout", HandlerLogout)
 	}
-
-	//router.Handle("GET", "/login", HandlerLogin(auth))
-	//router.Handle("GET", "/callback", HandlerCallback(auth))
-	//router.Handle("POST", "/claim", middleware.IsAuthenticated, s.handleClaim())
-	//router.Handle("GET", "/info", s.handleInfo())
-	//router.Handle("GET", "/requested", s.handleLastRequest())
-	//router.Handle("GET", "/logout", HandlerLogout)
 
 	return router
 }
@@ -149,43 +128,44 @@ func (s *Server) consumeQueue() {
 
 func (s *Server) handleClaim() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-
-		log.WithFields(log.Fields{
-			"address": ctx.Request.FormValue(AddressKey),
-			"user_id": ctx.Request.FormValue(UserId),
-			"ip":      ctx.Request.RemoteAddr,
-		}).Info("Received request")
-
 		address := ctx.Request.PostFormValue(AddressKey)
 		re := regexp.MustCompile("^0x[0-9a-fA-F]{40}$")
 		if !re.MatchString(address) {
 			ctx.String(http.StatusInternalServerError, "Invalid address")
 			return
 		}
-		//
-		//userId := r.PostFormValue(UserId)
-		//if len(userId) == 0 {
-		//	http.Error(w, "github account not valid", http.StatusBadRequest)
-		//	return
-		//}
-		//
-		//github, err := s.checkUser(userId)
-		//if err != nil {
-		//	http.Error(w, "failed to get user data", http.StatusBadRequest)
-		//	return
-		//}
 
 		session := sessions.Default(ctx)
 		profile := session.Get("profile")
 
-		fmt.Println(profile)
+		if profile == nil {
+			ctx.String(http.StatusInternalServerError, "You need to login first")
+			return
+		}
 
-		//_, err = s.requestStore.Insert(*github, address)
-		//if err != nil {
-		//	log.WithError(err).Error("Failed to save request")
-		//	http.Error(w, err.Error(), http.StatusInternalServerError)
-		//	return
-		//}
+		type profileData struct {
+			Nickname string `json:"nickname"`
+		}
+
+		var user profileData
+
+		err := json.Unmarshal(profile.([]byte), &user)
+		if err != nil {
+			ctx.String(http.StatusInternalServerError, "Failed to parse the profile")
+			return
+		}
+
+		log.WithFields(log.Fields{
+			"address": address,
+			"github":  user.Nickname,
+		}).Info("Received request")
+
+		_, err = s.requestStore.Insert(user.Nickname, address)
+		if err != nil {
+			log.WithError(err).Error("Failed to save request")
+			ctx.String(http.StatusInternalServerError, err.Error())
+			return
+		}
 
 		// Try to lock mutex if the work queue is empty
 		if len(s.queue) != 0 || !s.mutex.TryLock() {
