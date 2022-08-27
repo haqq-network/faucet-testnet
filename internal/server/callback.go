@@ -1,7 +1,6 @@
 package server
 
 import (
-	"fmt"
 	"net/http"
 
 	"github.com/gin-contrib/sessions"
@@ -37,11 +36,8 @@ func HandlerCallback(auth *authenticator.Authenticator) gin.HandlerFunc {
 			return
 		}
 
-		fmt.Println(token.AccessToken)
-
 		session.Set("access_token", token.AccessToken)
 		session.Set("profile", profile)
-		fmt.Printf("%+v", profile)
 		if err := session.Save(); err != nil {
 			ctx.String(http.StatusInternalServerError, err.Error())
 			return

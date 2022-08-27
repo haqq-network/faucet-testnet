@@ -214,11 +214,15 @@ type request struct {
 func (s *Server) handleLastRequest() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 
-		github := ctx.Request.FormValue(GithubKey)
-		if len(github) == 0 {
-			ctx.String(http.StatusInternalServerError, "Empty github name")
+		session := sessions.Default(ctx)
+		profile := session.Get("profile")
+
+		if profile == nil {
+			ctx.String(http.StatusInternalServerError, "You need to login first")
 			return
 		}
+
+		github := profile.(map[string]interface{})["nickname"].(string)
 
 		req, err := s.requestStore.Get(github)
 		if err != nil {
