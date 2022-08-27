@@ -143,24 +143,14 @@ func (s *Server) handleClaim() gin.HandlerFunc {
 			return
 		}
 
-		type profileData struct {
-			Nickname string `json:"nickname"`
-		}
-
-		var user profileData
-
-		err := json.Unmarshal(profile.([]byte), &user)
-		if err != nil {
-			ctx.String(http.StatusInternalServerError, "Failed to parse the profile")
-			return
-		}
+		github := profile.(map[string]interface{})["nickname"].(string)
 
 		log.WithFields(log.Fields{
 			"address": address,
-			"github":  user.Nickname,
+			"github":  github,
 		}).Info("Received request")
 
-		_, err = s.requestStore.Insert(user.Nickname, address)
+		_, err := s.requestStore.Insert(github, address)
 		if err != nil {
 			log.WithError(err).Error("Failed to save request")
 			ctx.String(http.StatusInternalServerError, err.Error())
@@ -204,7 +194,7 @@ func (s *Server) handleClaim() gin.HandlerFunc {
 			"txHash":  txHash,
 			"address": address,
 		}).Info("Funded directly successfully")
-		ctx.String(http.StatusOK, "Txhash: %s", txHash)
+		ctx.String(http.StatusOK, "Tx hash: %s", txHash)
 	}
 }
 

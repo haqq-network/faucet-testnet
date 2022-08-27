@@ -20,7 +20,7 @@ func init() {
 	viper.SetDefault("httpport", "8080")
 	viper.SetDefault("proxycount", 0)
 	viper.SetDefault("queuecap", 100)
-	viper.SetDefault("amount", 1000)
+	viper.SetDefault("amount", 1)
 	viper.SetDefault("interval", 1440)
 	viper.SetDefault("chain", 53211)
 	viper.SetDefault("slack_hook", "https://hooks.slack.com/services/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")
