@@ -56,8 +56,9 @@ async function loginWithPopup(client, options) {
   }
 }
 
-function logout(client) {
-  return client.logout();
+async function logout() {
+  // return client.logout();
+  location.href = '/api/logout';
 }
 
 const auth = {

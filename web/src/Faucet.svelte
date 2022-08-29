@@ -23,7 +23,7 @@
     $selectedAccount || '0x0000000000000000000000000000000000000000';
   $: balance = $connected ? $web3.eth.getBalance(checkAccount) : '';
 
-  let auth0Client;
+  let auth0Client: any;
   let address = null;
   let github = null;
   let countdown = null;
@@ -50,7 +50,7 @@
     animate: { in: 'fadeIn', out: 'fadeOut' },
   });
 
-  async function githubUserRequest(value) {
+  async function githubUserRequest(value: any) {
     if (value?.nickname) {
       try {
         isChecked.set(false);
@@ -83,9 +83,15 @@
     }
   }
 
+  async function fetchGithubUser() {
+    const response = await fetch('/api/info');
+    const body = await response.json();
+    return body;
+  }
+
   // onMount hook
   onMount(async () => {
-    loading = true;
+    loading = false;
     web3.subscribe(web3BalanceSubscribe);
     if (!window?.ethereum) loading = false;
     if (window?.ethereum) {
@@ -93,12 +99,12 @@
       unsubscribeGithubUser = githubUser.subscribe(githubUserRequest);
       if (localStorage.getItem('metaMaskConnected')) {
         await defaultEvmStores.setProvider();
-        auth0Client = await auth.createClient();
+        auth0Client = await fetchGithubUser();
       }
       if (localStorage.getItem('githubConnected')) {
-        auth0Client = await auth.createClient();
-        githubUser.set(await auth0Client.getUser());
-        isAuthenticated.set(await auth0Client.isAuthenticated());
+        auth0Client = await await fetchGithubUser();
+        githubUser.set(auth0Client);
+        isAuthenticated.set(true);
       }
     }
     loading = false;
@@ -122,7 +128,7 @@
   });
 
   // countdown timer
-  const handleRequestTime = (value) => {
+  const handleRequestTime = (value: number | any) => {
     if (!value) {
       clearInterval(countdown);
       return;
@@ -257,7 +263,7 @@
     });
   };
 
-  function capitalize(str) {
+  function capitalize(str: string) {
     const lower = str.toLowerCase();
     return str.charAt(0).toUpperCase() + lower.slice(1);
   }
@@ -266,11 +272,11 @@
   async function githubLogin() {
     loading = true;
     try {
-      auth0Client = await auth.createClient();
-      await auth.loginWithPopup(auth0Client);
-      githubUser.set(await auth0Client.getUser());
-      localStorage.setItem('githubConnected', true);
-      isAuthenticated.set(await auth0Client.isAuthenticated());
+      location.href = '/api/login';
+      auth0Client = fetchGithubUser();
+      githubUser.set(auth0Client);
+      localStorage.setItem('githubConnected', 'true');
+      isAuthenticated.set(true);
       loading = false;
     } catch (error) {
       bulmaToast.toast({
@@ -285,12 +291,12 @@
   // logout github
   function githubLogout() {
     loading = true;
-    auth.logout(auth0Client);
+    auth.logout();
     localStorage.removeItem('githubUser');
     localStorage.removeItem('githubConnected');
     githubUser.set({});
     isTokenRequested.set(false);
-    lastRequestedTime(null);
+    lastRequestedTime.set(null);
     loading = false;
   }
 

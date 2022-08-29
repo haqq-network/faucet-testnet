@@ -3,29 +3,35 @@ package server
 import (
 	"bytes"
 	"context"
+	"encoding/gob"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"regexp"
-	"strconv"
 	"time"
 
+	"github.com/gin-contrib/sessions"
+	"github.com/gin-contrib/sessions/cookie"
+	"github.com/gin-contrib/static"
 	"github.com/go-pg/pg"
 	"github.com/haqq-network/faucet-testnet/database"
-	"github.com/rs/cors"
+	"github.com/haqq-network/faucet-testnet/internal/authenticator"
+	"github.com/haqq-network/faucet-testnet/internal/middleware"
+	"github.com/joho/godotenv"
 	"github.com/spf13/viper"
+
+	"github.com/gin-gonic/gin"
 
 	"github.com/LK4D4/trylock"
 	log "github.com/sirupsen/logrus"
-	"github.com/urfave/negroni"
 
 	"github.com/haqq-network/faucet-testnet/internal/chain"
-	"github.com/haqq-network/faucet-testnet/web"
 )
 
 const AddressKey string = "address"
 const GithubKey string = "github"
+const UserId string = "user_id"
 
 type Server struct {
 	chain.TxBuilder
@@ -52,17 +58,24 @@ func NewServer(builder chain.TxBuilder) *Server {
 	}
 }
 
-func (s *Server) setupRouter() *http.ServeMux {
-	router := http.NewServeMux()
+func (s *Server) setupRouter(auth *authenticator.Authenticator) *gin.Engine {
+	router := gin.Default()
+	gob.Register(map[string]interface{}{})
 
-	router.Handle("/", http.FileServer(web.Dist()))
+	store := cookie.NewStore([]byte("secret"))
+	router.Use(sessions.Sessions("auth-session", store))
 
-	// TODO: disable IP limiter
-	//limiter := NewLimiter(viper.GetInt("proxycount"), time.Duration(viper.GetInt("interval"))*time.Minute)
-	//router.Handle("/api/claim", negroni.New(limiter, negroni.Wrap(s.handleClaim())))
-	router.Handle("/api/claim", s.handleClaim())
-	router.Handle("/api/info", s.handleInfo())
-	router.Handle("/api/requested", s.handleLastRequest())
+	router.Use(static.Serve("/", static.LocalFile("./web/public", true)))
+
+	api := router.Group("/api")
+	{
+		api.GET("/login", HandlerLogin(auth))
+		api.GET("/callback", HandlerCallback(auth))
+		api.POST("/claim", middleware.IsAuthenticated, s.handleClaim())
+		api.GET("/info", middleware.IsAuthenticated, s.handleInfo())
+		api.GET("/requested", middleware.IsAuthenticated, s.handleLastRequest())
+		api.GET("/logout", HandlerLogout)
+	}
 
 	return router
 }
@@ -75,15 +88,21 @@ func (s *Server) Run() {
 		}
 	}()
 
-	c := cors.New(cors.Options{
-		AllowedOrigins: []string{"https://testedge.haqq.network"},
-	})
+	if err := godotenv.Load(); err != nil {
+		log.Fatalf("Failed to load the env vars: %v", err)
+	}
 
-	n := negroni.New(negroni.NewRecovery(), negroni.NewLogger())
-	n.Use(c)
-	n.UseHandler(s.setupRouter())
-	log.Infof("Starting http server %d", viper.GetInt("httpport"))
-	log.Fatal(http.ListenAndServe(":"+strconv.Itoa(viper.GetInt("httpport")), n))
+	auth, err := authenticator.New()
+	if err != nil {
+		log.Fatalf("Failed to initialize the authenticator: %v", err)
+	}
+
+	rtr := s.setupRouter(auth)
+
+	log.Print("Server listening on http://localhost:" + viper.GetString("httpport"))
+	if err := http.ListenAndServe(":"+viper.GetString("httpport"), rtr); err != nil {
+		log.Fatalf("There was an error with the http server: %v", err)
+	}
 }
 
 func (s *Server) consumeQueue() {
@@ -107,37 +126,34 @@ func (s *Server) consumeQueue() {
 	}
 }
 
-func (s *Server) handleClaim() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != "POST" {
-			http.NotFound(w, r)
-			return
-		}
-
-		log.WithFields(log.Fields{
-			"address": r.FormValue(AddressKey),
-			"github":  r.FormValue(GithubKey),
-			"ip":      r.RemoteAddr,
-		}).Info("Received request")
-
-		address := r.PostFormValue(AddressKey)
+func (s *Server) handleClaim() gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		address := ctx.Request.PostFormValue(AddressKey)
 		re := regexp.MustCompile("^0x[0-9a-fA-F]{40}$")
 		if !re.MatchString(address) {
-			http.Error(w, "Invalid address", http.StatusBadRequest)
+			ctx.String(http.StatusInternalServerError, "Invalid address")
 			return
 		}
 
-		github := r.PostFormValue(GithubKey)
-		// TODO: check if user has valid github account
-		if len(github) == 0 {
-			http.Error(w, "github account not valid", http.StatusBadRequest)
+		session := sessions.Default(ctx)
+		profile := session.Get("profile")
+
+		if profile == nil {
+			ctx.String(http.StatusInternalServerError, "You need to login first")
 			return
 		}
+
+		github := profile.(map[string]interface{})["nickname"].(string)
+
+		log.WithFields(log.Fields{
+			"address": address,
+			"github":  github,
+		}).Info("Received request")
 
 		_, err := s.requestStore.Insert(github, address)
 		if err != nil {
 			log.WithError(err).Error("Failed to save request")
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			ctx.String(http.StatusInternalServerError, err.Error())
 			return
 		}
 
@@ -148,17 +164,16 @@ func (s *Server) handleClaim() http.HandlerFunc {
 				log.WithFields(log.Fields{
 					"address": address,
 				}).Info("Added to queue successfully")
-				fmt.Fprintf(w, "Added %s to the queue", address)
+				fmt.Fprintf(ctx.Writer, "Added %s to the queue", address)
 			default:
 				log.Warn("Max queue capacity reached")
 				errMsg := "Faucet queue is too long, please try again later"
-				http.Error(w, errMsg, http.StatusServiceUnavailable)
+				ctx.String(http.StatusServiceUnavailable, errMsg)
+				return
 			}
 			return
 		}
 
-		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
-		defer cancel()
 		txHash, err := s.Transfer(ctx, address, chain.EtherToWei(viper.GetInt64("amount")))
 		s.mutex.Unlock()
 		if err != nil {
@@ -171,7 +186,7 @@ func (s *Server) handleClaim() http.HandlerFunc {
 				}
 			}()
 			log.WithError(err).Error("Failed to send transaction")
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			ctx.String(http.StatusServiceUnavailable, "Failed to send transaction")
 			return
 		}
 
@@ -179,58 +194,48 @@ func (s *Server) handleClaim() http.HandlerFunc {
 			"txHash":  txHash,
 			"address": address,
 		}).Info("Funded directly successfully")
-		fmt.Fprintf(w, "Txhash: %s", txHash)
+		ctx.String(http.StatusOK, "Tx hash: %s", txHash)
 	}
 }
 
-func (s *Server) handleInfo() http.HandlerFunc {
-	type info struct {
-		Account string `json:"account"`
-		Payout  string `json:"payout"`
-	}
-	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != "GET" {
-			http.NotFound(w, r)
-			return
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(info{
-			Account: s.Sender().String(),
-			Payout:  strconv.Itoa(viper.GetInt("amount")),
-		})
+func (s *Server) handleInfo() gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		session := sessions.Default(ctx)
+		profile := session.Get("profile")
+		ctx.JSON(http.StatusOK, profile)
 	}
 }
 
-func (s *Server) handleLastRequest() http.HandlerFunc {
-	type request struct {
-		Github            string `json:"github"`
-		LastRequestedTime int64  `json:"last_requested_time"`
-	}
-	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != "GET" {
-			http.NotFound(w, r)
+type request struct {
+	Github            string `json:"github"`
+	LastRequestedTime int64  `json:"last_requested_time"`
+}
+
+func (s *Server) handleLastRequest() gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+
+		session := sessions.Default(ctx)
+		profile := session.Get("profile")
+
+		if profile == nil {
+			ctx.String(http.StatusInternalServerError, "You need to login first")
 			return
 		}
 
-		github := r.FormValue(GithubKey)
-		if len(github) == 0 {
-			http.Error(w, "Empty github name", http.StatusInternalServerError)
-			return
-		}
+		github := profile.(map[string]interface{})["nickname"].(string)
 
 		req, err := s.requestStore.Get(github)
 		if err != nil {
 			if err.Error() == "pg: no rows in result set" {
-				http.Error(w, "Account not found", http.StatusNotFound)
+				ctx.String(http.StatusNotFound, "Account not found")
 				return
 			}
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			ctx.String(http.StatusInternalServerError, err.Error())
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(request{
+		ctx.Writer.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(ctx.Writer).Encode(request{
 			Github:            req.Github,
 			LastRequestedTime: req.RequestDate,
 		})
